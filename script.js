@@ -1,6 +1,6 @@
 // Scene setup
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000); // Increased far plane
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
@@ -29,8 +29,8 @@ scene.add(directionalLight);
 const textureLoader = new THREE.TextureLoader();
 const gltfLoader = new THREE.GLTFLoader();
 
-// Terrain (flat with dirt texture)
-const terrainSize = 100;
+// Terrain (much larger with dirt texture)
+const terrainSize = 1000; // 10x larger
 const terrainGeometry = new THREE.PlaneGeometry(terrainSize, terrainSize);
 const dirtTexture = textureLoader.load(
     'textures/dirt.jpg',
@@ -39,13 +39,13 @@ const dirtTexture = textureLoader.load(
     (error) => console.error('Texture loading failed:', error)
 );
 dirtTexture.wrapS = dirtTexture.wrapT = THREE.RepeatWrapping;
-dirtTexture.repeat.set(1, 1);
+dirtTexture.repeat.set(5, 5); // Increased tiling for larger terrain
 const terrainMaterial = new THREE.MeshPhongMaterial({ map: dirtTexture });
 const terrainMesh = new THREE.Mesh(terrainGeometry, terrainMaterial);
 terrainMesh.rotation.x = -Math.PI / 2;
 scene.add(terrainMesh);
 
-// Physics terrain (flat plane)
+// Physics terrain (flat plane, infinite in Cannon.js)
 const groundShape = new CANNON.Plane();
 const groundBody = new CANNON.Body({ mass: 0, material: groundMaterial });
 groundBody.addShape(groundShape);
@@ -108,6 +108,27 @@ gltfLoader.load(
     (error) => console.error('ATV loading failed:', error)
 );
 
+// Dust particles
+const particleGeometry = new THREE.BufferGeometry();
+const particleCount = 200;
+const posArray = new Float32Array(particleCount * 3);
+for (let i = 0; i < particleCount * 3; i++) posArray[i] = 0;
+particleGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+const particleMaterial = new THREE.PointsMaterial({ color: 0x654321, size: 0.2, transparent: true, opacity: 0.8 });
+const dustParticles = new THREE.Points(particleGeometry, particleMaterial);
+scene.add(dustParticles);
+
+// Speedometer UI
+const speedometer = document.createElement('div');
+speedometer.style.position = 'absolute';
+speedometer.style.top = '10px';
+speedometer.style.left = '10px';
+speedometer.style.color = 'white';
+speedometer.style.fontSize = '20px';
+speedometer.style.background = 'rgba(0, 0, 0, 0.5)';
+speedometer.style.padding = '5px';
+document.body.appendChild(speedometer);
+
 // Camera setup (initial position behind ATV)
 camera.position.set(0, 10, -10); // Behind ATV’s back
 camera.lookAt(0, 0, 0);
@@ -138,8 +159,8 @@ function animate() {
     world.step(1 / 60);
 
     // Controls
-    const speed = 100; // Increased for you
-    const turnSpeed = 1.75; // Increased for sharper turns
+    const speed = 100; // Your preferred value
+    const turnSpeed = 1.75; // Your preferred value
     const localDirection = new CANNON.Vec3(0, 0, -1); // Local forward (front of ATV)
     const worldDirection = chassisBody.quaternion.vmult(localDirection);
     worldDirection.y = 0;
@@ -163,6 +184,34 @@ function animate() {
         atvMesh.position.copy(chassisBody.position);
         atvMesh.position.y += 1.7; // Your favorite offset
         atvMesh.quaternion.copy(chassisBody.quaternion);
+
+        // Dust particles (tighter timing and lower position)
+        const velocityMagnitude = Math.sqrt(chassisBody.velocity.x ** 2 + chassisBody.velocity.z ** 2);
+        const positions = dustParticles.geometry.attributes.position.array;
+        if (velocityMagnitude > 0.5) { // Lower threshold for quicker start
+            for (let i = 0; i < particleCount; i++) {
+                const idx = i * 3;
+                if (positions[idx + 1] < -0.4 || Math.random() < 0.2) { // Respawn faster, lower bound
+                    positions[idx] = atvMesh.position.x + (Math.random() - 0.5) * 4; // Spread horizontally
+                    positions[idx + 1] = 0 + Math.random() * 0.4; // Just above ground (y = 0 to 0.4)
+                    positions[idx + 2] = atvMesh.position.z + (Math.random() - 0.5) * 1; // Closer to ATV
+                } else {
+                    positions[idx + 1] -= 0.05; // Fall
+                    positions[idx] += (Math.random() - 0.5) * 0.1; // Drift
+                    positions[idx + 2] += (Math.random() - 0.5) * 0.1;
+                }
+            }
+        } else { // Reset quickly when stopped
+            for (let i = 0; i < particleCount * 3; i += 3) {
+                positions[i + 1] -= 0.1; // Fall faster when stopped
+                if (positions[i + 1] < -0.4) positions[i + 1] = -0.4; // Clamp to ground
+            }
+        }
+        dustParticles.geometry.attributes.position.needsUpdate = true;
+
+        // Speedometer
+        const speedDisplay = (velocityMagnitude * 3.6).toFixed(1); // Convert to "km/h"
+        speedometer.textContent = `Speed: ${speedDisplay} km/h`;
 
         // Camera follow (behind ATV’s back)
         const cameraOffset = new THREE.Vector3(0, 5, -10); // Up 5, behind 10
