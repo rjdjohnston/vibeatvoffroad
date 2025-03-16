@@ -7,15 +7,15 @@ document.body.appendChild(renderer.domElement);
 
 // Physics world
 const world = new CANNON.World();
-world.gravity.set(0, -9.82, 0);
+world.gravity.set(0, -15.82, 0);
 world.broadphase = new CANNON.NaiveBroadphase();
 world.solver.iterations = 20;
 
-// Materials for friction
+// Materials
 const groundMaterial = new CANNON.Material('ground');
 const vehicleMaterial = new CANNON.Material('vehicle');
 const contactMaterial = new CANNON.ContactMaterial(groundMaterial, vehicleMaterial, {
-    friction: 1.0, // Increased friction
+    friction: 1.0,
     restitution: 0.05
 });
 world.addContactMaterial(contactMaterial);
@@ -31,7 +31,7 @@ scene.add(directionalLight);
 const textureLoader = new THREE.TextureLoader();
 const gltfLoader = new THREE.GLTFLoader();
 
-// Base terrain (flat with dirt texture)
+// Base terrain
 const terrainSize = 1000;
 const terrainGeometry = new THREE.PlaneGeometry(terrainSize, terrainSize);
 const dirtTexture = textureLoader.load(
@@ -45,9 +45,10 @@ dirtTexture.repeat.set(5, 5);
 const terrainMaterial = new THREE.MeshPhongMaterial({ map: dirtTexture });
 const terrainMesh = new THREE.Mesh(terrainGeometry, terrainMaterial);
 terrainMesh.rotation.x = -Math.PI / 2;
+terrainMesh.position.set(0, 0, 0);
 scene.add(terrainMesh);
 
-// Physics terrain (flat plane)
+// Physics terrain
 const groundShape = new CANNON.Plane();
 const groundBody = new CANNON.Body({ mass: 0, material: groundMaterial });
 groundBody.addShape(groundShape);
@@ -55,58 +56,68 @@ groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
 groundBody.position.set(0, 0, 0);
 world.addBody(groundBody);
 
-// Hill (simple cone mesh)
-const hillRadius = 50;
-const hillHeight = 10;
-const hillGeometry = new THREE.ConeGeometry(hillRadius, hillHeight, 32);
-const hillMesh = new THREE.Mesh(hillGeometry, terrainMaterial.clone());
-hillMesh.position.set(0, hillHeight / 2, 50);
-console.log('Hill mesh position:', hillMesh.position);
-scene.add(hillMesh);
+// Race Track Material
+const trackMaterial = new THREE.MeshPhongMaterial({ color: 0xE69138 });
+trackMaterial.needsUpdate = true;
 
-// Physics hill (adjusted trapezoid ramp facing -z)
-const hillVertices = [
-    new CANNON.Vec3(-hillRadius, 0, -hillRadius), // 0: Bottom near left
-    new CANNON.Vec3(hillRadius, 0, -hillRadius),  // 1: Bottom near right
-    new CANNON.Vec3(hillRadius, 0, hillRadius),   // 2: Bottom far right
-    new CANNON.Vec3(-hillRadius, 0, hillRadius),  // 3: Bottom far left
-    new CANNON.Vec3(-10, hillHeight, -10),        // 4: Top near left (narrower)
-    new CANNON.Vec3(10, hillHeight, -10),         // 5: Top near right
-    new CANNON.Vec3(10, hillHeight, hillRadius / 2), // 6: Top far right (shorter)
-    new CANNON.Vec3(-10, hillHeight, hillRadius / 2) // 7: Top far left
-];
-const hillFaces = [
-    [0, 4, 5, 1], // Near slope (CCW)
-    [1, 5, 6, 2], // Right face (CCW)
-    [2, 6, 7, 3], // Far face (CCW)
-    [3, 7, 4, 0], // Left face (CCW)
-    [0, 1, 2, 3], // Bottom (CCW)
-    [7, 6, 5, 4]  // Top (CCW)
-];
-const hillShape = new CANNON.ConvexPolyhedron(hillVertices, hillFaces);
-const hillBody = new CANNON.Body({ mass: 0, material: groundMaterial });
-hillBody.addShape(hillShape);
-hillBody.position.set(0, 0, 50);
-world.addBody(hillBody);
+// Simple Oval Track (500x500, 40 wide)
+const trackGeometry = new THREE.RingGeometry(210, 250, 32, 1, 0, 2 * Math.PI);
+const trackMesh = new THREE.Mesh(trackGeometry, trackMaterial);
+trackMesh.rotation.x = -Math.PI / 2;
+trackMesh.position.set(0, 0.1, 0);
+scene.add(trackMesh);
 
-// ATV physics (chassis and wheels)
+// Physics Oval Track
+const trackVertices = [
+    new CANNON.Vec3(-250, 0, -210),
+    new CANNON.Vec3(250, 0, -210),
+    new CANNON.Vec3(250, 0, 210),
+    new CANNON.Vec3(-250, 0, 210),
+    new CANNON.Vec3(-210, 0, -210),
+    new CANNON.Vec3(210, 0, -210),
+    new CANNON.Vec3(210, 0, 210),
+    new CANNON.Vec3(-210, 0, 210)
+];
+const trackFaces = [
+    [0, 1, 2, 3],
+    [4, 5, 6, 7],
+    [0, 4, 5, 1],
+    [1, 5, 6, 2],
+    [2, 6, 7, 3],
+    [3, 7, 4, 0]
+];
+const trackShape = new CANNON.ConvexPolyhedron(trackVertices, trackFaces);
+const trackBody = new CANNON.Body({ mass: 0, material: groundMaterial });
+trackBody.addShape(trackShape);
+trackBody.position.set(0, 0.1, 0);
+world.addBody(trackBody);
+
+// Start/Finish Line
+const lineGeometry = new THREE.PlaneGeometry(40, 2);
+const lineMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+const lineMesh = new THREE.Mesh(lineGeometry, lineMaterial);
+lineMesh.rotation.x = -Math.PI / 2;
+lineMesh.position.set(230, 0.21, 0); // Aligned with track edge
+scene.add(lineMesh);
+
+// ATV physics
 const chassisShape = new CANNON.Box(new CANNON.Vec3(1, 0.5, 1));
 const chassisBody = new CANNON.Body({ mass: 50, material: vehicleMaterial });
 chassisBody.addShape(chassisShape);
-world.addBody(chassisBody);
-chassisBody.position.set(0, 5, -20);
+chassisBody.position.set(230, 0.6, 0); // On track edge
 chassisBody.velocity.set(0, 0, 0);
 chassisBody.angularVelocity.set(0, 0, 0);
 chassisBody.quaternion.set(0, 0, 0, 1);
-chassisBody.linearDamping = 0.9; // High initially
+chassisBody.linearDamping = 0.9;
 chassisBody.angularDamping = 0.9;
+world.addBody(chassisBody);
 
-// Wheels (wider base)
+// Wheels
 const wheelShape = new CANNON.Sphere(0.5);
 const wheelBodies = [];
 const wheelConstraints = [];
 const wheelPositions = [
-    new CANNON.Vec3(-1.5, -0.5, -1), // Wider x
+    new CANNON.Vec3(-1.5, -0.5, -1),
     new CANNON.Vec3(1.5, -0.5, -1),
     new CANNON.Vec3(-1.5, -0.5, 1),
     new CANNON.Vec3(1.5, -0.5, 1)
@@ -131,6 +142,9 @@ wheelPositions.forEach((pos, index) => {
     world.addConstraint(constraint);
     wheelConstraints.push(constraint);
 });
+
+// Step physics once to settle
+world.step(1 / 60);
 
 // Load ATV model
 let atvMesh;
@@ -172,8 +186,8 @@ speedometer.style.padding = '5px';
 document.body.appendChild(speedometer);
 
 // Camera setup
-camera.position.set(0, 10, -30);
-camera.lookAt(0, 0, 0);
+camera.position.set(230, 10, -30); // Adjusted to start
+camera.lookAt(230, 0, 0);
 
 // Keyboard controls
 const controls = { forward: false, backward: false, left: false, right: false };
@@ -202,7 +216,7 @@ function animate() {
     world.step(1 / 60);
 
     // Controls
-    const speed = 700; // Reduced for control
+    const speed = 700;
     const turnSpeed = 1.75;
     const localDirection = new CANNON.Vec3(0, 0, -1);
     const worldDirection = chassisBody.quaternion.vmult(localDirection);
@@ -230,7 +244,7 @@ function animate() {
         chassisBody.angularDamping = 0.5;
     }
 
-    // Cap angular velocity during jump
+    // Cap angular velocity
     const maxAngular = 5;
     chassisBody.angularVelocity.x = Math.max(-maxAngular, Math.min(maxAngular, chassisBody.angularVelocity.x));
     chassisBody.angularVelocity.y = Math.max(-maxAngular, Math.min(maxAngular, chassisBody.angularVelocity.y));
@@ -279,9 +293,9 @@ function animate() {
         camera.lookAt(atvMesh.position);
     }
 
-    // Reset if ATV falls too far or flies too high
+    // Reset if needed
     if (chassisBody.position.y < -10 || chassisBody.position.y > 50) {
-        chassisBody.position.set(0, 5, -20);
+        chassisBody.position.set(230, 0.6, 0);
         chassisBody.velocity.set(0, 0, 0);
         chassisBody.angularVelocity.set(0, 0, 0);
         chassisBody.quaternion.set(0, 0, 0, 1);
