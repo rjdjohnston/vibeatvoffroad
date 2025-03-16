@@ -1,0 +1,373 @@
+{
+  "accessors": [
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 60343,
+      "max": [
+        36.854000091552734,
+        -5.046500205993652,
+        41.21799850463867
+      ],
+      "min": [
+        -18.68400001525879,
+        -37.720001220703125,
+        -40.821998596191406
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 724116,
+      "componentType": 5126,
+      "count": 60343,
+      "max": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "min": [
+        -1.0,
+        -1.0,
+        -1.0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 0,
+      "componentType": 5125,
+      "count": 165210,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 1448232,
+      "componentType": 5126,
+      "count": 16113,
+      "max": [
+        29.96299934387207,
+        -16.451900482177734,
+        38.73400115966797
+      ],
+      "min": [
+        -10.388999938964844,
+        -38.4739990234375,
+        -38.35900115966797
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 1641588,
+      "componentType": 5126,
+      "count": 16113,
+      "max": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "min": [
+        -1.0,
+        -1.0,
+        -1.0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 660840,
+      "componentType": 5125,
+      "count": 47646,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 1834944,
+      "componentType": 5126,
+      "count": 6110,
+      "max": [
+        16.21579933166504,
+        -26.456300735473633,
+        31.689599990844727
+      ],
+      "min": [
+        1.8686000108718872,
+        -39.051998138427734,
+        -36.6255989074707
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 1908264,
+      "componentType": 5126,
+      "count": 6110,
+      "max": [
+        0.9999893307685852,
+        1.0,
+        0.9998766779899597
+      ],
+      "min": [
+        -0.9999445080757141,
+        -1.0,
+        -1.0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 851424,
+      "componentType": 5125,
+      "count": 19056,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 1981584,
+      "componentType": 5126,
+      "count": 41133,
+      "max": [
+        37.87900161743164,
+        -0.0,
+        40.915000915527344
+      ],
+      "min": [
+        -19.709999084472656,
+        -50.0,
+        -42.41299819946289
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 2475180,
+      "componentType": 5126,
+      "count": 41133,
+      "max": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "min": [
+        -1.0,
+        -1.0,
+        -1.0
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 927648,
+      "componentType": 5125,
+      "count": 104793,
+      "type": "SCALAR"
+    }
+  ],
+  "asset": {
+    "extras": {
+      "author": "moto man 135 (https://sketchfab.com/csharp122705)",
+      "license": "CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)",
+      "source": "https://sketchfab.com/3d-models/suzuki-quadzilla-500-atv-62c046fe80614cd09d66b792b7947569",
+      "title": "Suzuki Quadzilla 500 ATV"
+    },
+    "generator": "Sketchfab-12.65.0",
+    "version": "2.0"
+  },
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 1346820,
+      "name": "floatBufferViews",
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2968776,
+      "byteOffset": 1346820,
+      "byteStride": 12,
+      "name": "floatBufferViews",
+      "target": 34962
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 4315596,
+      "uri": "scene.bin"
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "name": "color_12568524",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.39293959271960066,
+          0.40939749892076926,
+          0.41968395259897007,
+          1.0
+        ],
+        "metallicFactor": 0.5185247675853808,
+        "roughnessFactor": 0.40851315445463887
+      }
+    },
+    {
+      "doubleSided": true,
+      "name": "color_16768282",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          1.0,
+          0.7987257024116523,
+          0.0,
+          1.0
+        ],
+        "metallicFactor": 0.0,
+        "roughnessFactor": 0.0
+      }
+    },
+    {
+      "doubleSided": true,
+      "name": "color_24813",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.0,
+          0.376471,
+          0.929412,
+          1.0
+        ],
+        "metallicFactor": 0.0,
+        "roughnessFactor": 0.46323471292462404
+      }
+    },
+    {
+      "doubleSided": true,
+      "name": "color_2829873",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.04642602158309468,
+          0.049665135983072796,
+          0.0529042503830509,
+          1.0
+        ],
+        "metallicFactor": 0.0
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Object_0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 1,
+            "POSITION": 0
+          },
+          "indices": 2,
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Object_1",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 4,
+            "POSITION": 3
+          },
+          "indices": 5,
+          "material": 1,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Object_2",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 7,
+            "POSITION": 6
+          },
+          "indices": 8,
+          "material": 2,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "Object_3",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 10,
+            "POSITION": 9
+          },
+          "indices": 11,
+          "material": 3,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "children": [
+        1
+      ],
+      "matrix": [
+        1.0,
+        4.8033446892643715e-32,
+        -1.6081226229577292e-16,
+        0.0,
+        -1.232595164407831e-32,
+        -1.0,
+        -4.440892098500626e-16,
+        0.0,
+        -1.6081226229577292e-16,
+        4.440892098500626e-16,
+        -1.0,
+        0.0,
+        0.0,
+        -25.597534179687507,
+        24.402523040771477,
+        1.0
+      ],
+      "name": "Sketchfab_model"
+    },
+    {
+      "children": [
+        2,
+        3,
+        4,
+        5
+      ],
+      "name": "tinker.obj.cleaner.materialmerger.gles"
+    },
+    {
+      "mesh": 0,
+      "name": "Object_2"
+    },
+    {
+      "mesh": 1,
+      "name": "Object_3"
+    },
+    {
+      "mesh": 2,
+      "name": "Object_4"
+    },
+    {
+      "mesh": 3,
+      "name": "Object_5"
+    }
+  ],
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Sketchfab_Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+Model Information:
+* title:	Suzuki Quadzilla 500 ATV
+* source:	https://sketchfab.com/3d-models/suzuki-quadzilla-500-atv-62c046fe80614cd09d66b792b7947569
+* author:	moto man 135 (https://sketchfab.com/csharp122705)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Suzuki Quadzilla 500 ATV" (https://sketchfab.com/3d-models/suzuki-quadzilla-500-atv-62c046fe80614cd09d66b792b7947569) by moto man 135 (https://sketchfab.com/csharp122705) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
