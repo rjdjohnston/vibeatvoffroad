@@ -1,6 +1,6 @@
 // Scene setup
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000); // Increased far plane
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
@@ -8,13 +8,15 @@ document.body.appendChild(renderer.domElement);
 // Physics world
 const world = new CANNON.World();
 world.gravity.set(0, -9.82, 0);
+world.broadphase = new CANNON.NaiveBroadphase();
+world.solver.iterations = 20;
 
 // Materials for friction
 const groundMaterial = new CANNON.Material('ground');
 const vehicleMaterial = new CANNON.Material('vehicle');
 const contactMaterial = new CANNON.ContactMaterial(groundMaterial, vehicleMaterial, {
-    friction: 0.9, // Higher friction for grip
-    restitution: 0.1 // Slight bounce
+    friction: 1.0, // Increased friction
+    restitution: 0.05
 });
 world.addContactMaterial(contactMaterial);
 
@@ -29,8 +31,8 @@ scene.add(directionalLight);
 const textureLoader = new THREE.TextureLoader();
 const gltfLoader = new THREE.GLTFLoader();
 
-// Terrain (much larger with dirt texture)
-const terrainSize = 1000; // 10x larger
+// Base terrain (flat with dirt texture)
+const terrainSize = 1000;
 const terrainGeometry = new THREE.PlaneGeometry(terrainSize, terrainSize);
 const dirtTexture = textureLoader.load(
     'textures/dirt.jpg',
@@ -39,52 +41,92 @@ const dirtTexture = textureLoader.load(
     (error) => console.error('Texture loading failed:', error)
 );
 dirtTexture.wrapS = dirtTexture.wrapT = THREE.RepeatWrapping;
-dirtTexture.repeat.set(5, 5); // Increased tiling for larger terrain
+dirtTexture.repeat.set(5, 5);
 const terrainMaterial = new THREE.MeshPhongMaterial({ map: dirtTexture });
 const terrainMesh = new THREE.Mesh(terrainGeometry, terrainMaterial);
 terrainMesh.rotation.x = -Math.PI / 2;
 scene.add(terrainMesh);
 
-// Physics terrain (flat plane, infinite in Cannon.js)
+// Physics terrain (flat plane)
 const groundShape = new CANNON.Plane();
 const groundBody = new CANNON.Body({ mass: 0, material: groundMaterial });
 groundBody.addShape(groundShape);
 groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+groundBody.position.set(0, 0, 0);
 world.addBody(groundBody);
 
-// ATV physics (chassis and wheels)
-const chassisShape = new CANNON.Box(new CANNON.Vec3(1, 0.5, 1)); // Original height
-const chassisBody = new CANNON.Body({ mass: 50, material: vehicleMaterial });
-chassisBody.addShape(chassisShape, new CANNON.Vec3(0, -0.1, 0)); // Slightly raised center of mass
-chassisBody.position.set(0, 3, 0); // Higher start for bounce
-chassisBody.linearDamping = 0.4;
-chassisBody.angularDamping = 0.7; // Reduced for slight tipping
-world.addBody(chassisBody);
+// Hill (simple cone mesh)
+const hillRadius = 50;
+const hillHeight = 10;
+const hillGeometry = new THREE.ConeGeometry(hillRadius, hillHeight, 32);
+const hillMesh = new THREE.Mesh(hillGeometry, terrainMaterial.clone());
+hillMesh.position.set(0, hillHeight / 2, 50);
+console.log('Hill mesh position:', hillMesh.position);
+scene.add(hillMesh);
 
-// Wheels (wider base for stability)
+// Physics hill (adjusted trapezoid ramp facing -z)
+const hillVertices = [
+    new CANNON.Vec3(-hillRadius, 0, -hillRadius), // 0: Bottom near left
+    new CANNON.Vec3(hillRadius, 0, -hillRadius),  // 1: Bottom near right
+    new CANNON.Vec3(hillRadius, 0, hillRadius),   // 2: Bottom far right
+    new CANNON.Vec3(-hillRadius, 0, hillRadius),  // 3: Bottom far left
+    new CANNON.Vec3(-10, hillHeight, -10),        // 4: Top near left (narrower)
+    new CANNON.Vec3(10, hillHeight, -10),         // 5: Top near right
+    new CANNON.Vec3(10, hillHeight, hillRadius / 2), // 6: Top far right (shorter)
+    new CANNON.Vec3(-10, hillHeight, hillRadius / 2) // 7: Top far left
+];
+const hillFaces = [
+    [0, 4, 5, 1], // Near slope (CCW)
+    [1, 5, 6, 2], // Right face (CCW)
+    [2, 6, 7, 3], // Far face (CCW)
+    [3, 7, 4, 0], // Left face (CCW)
+    [0, 1, 2, 3], // Bottom (CCW)
+    [7, 6, 5, 4]  // Top (CCW)
+];
+const hillShape = new CANNON.ConvexPolyhedron(hillVertices, hillFaces);
+const hillBody = new CANNON.Body({ mass: 0, material: groundMaterial });
+hillBody.addShape(hillShape);
+hillBody.position.set(0, 0, 50);
+world.addBody(hillBody);
+
+// ATV physics (chassis and wheels)
+const chassisShape = new CANNON.Box(new CANNON.Vec3(1, 0.5, 1));
+const chassisBody = new CANNON.Body({ mass: 50, material: vehicleMaterial });
+chassisBody.addShape(chassisShape);
+world.addBody(chassisBody);
+chassisBody.position.set(0, 5, -20);
+chassisBody.velocity.set(0, 0, 0);
+chassisBody.angularVelocity.set(0, 0, 0);
+chassisBody.quaternion.set(0, 0, 0, 1);
+chassisBody.linearDamping = 0.9; // High initially
+chassisBody.angularDamping = 0.9;
+
+// Wheels (wider base)
 const wheelShape = new CANNON.Sphere(0.5);
 const wheelBodies = [];
 const wheelConstraints = [];
 const wheelPositions = [
-    new CANNON.Vec3(-1.2, -0.40, -1),  // Front-left (wider, raised)
-    new CANNON.Vec3(1.2, -0.40, -1),   // Front-right (wider, raised)
-    new CANNON.Vec3(-1.2, -0.40, 1),   // Rear-left (wider, raised)
-    new CANNON.Vec3(1.2, -0.40, 1)     // Rear-right (wider, raised)
+    new CANNON.Vec3(-1.5, -0.5, -1), // Wider x
+    new CANNON.Vec3(1.5, -0.5, -1),
+    new CANNON.Vec3(-1.5, -0.5, 1),
+    new CANNON.Vec3(1.5, -0.5, 1)
 ];
 
 wheelPositions.forEach((pos, index) => {
-    const wheelBody = new CANNON.Body({ mass: 0.5, material: vehicleMaterial });
+    const wheelBody = new CANNON.Body({ mass: 2, material: vehicleMaterial });
     wheelBody.addShape(wheelShape);
     wheelBody.position.copy(chassisBody.position).vadd(pos);
+    wheelBody.velocity.set(0, 0, 0);
+    wheelBody.angularVelocity.set(0, 0, 0);
     world.addBody(wheelBody);
     wheelBodies.push(wheelBody);
 
-    // Hinge constraint for wheel rotation
     const constraint = new CANNON.HingeConstraint(chassisBody, wheelBody, {
         pivotA: pos,
         pivotB: new CANNON.Vec3(0, 0, 0),
-        axisA: new CANNON.Vec3(1, 0, 0), // Rotate around x-axis
-        axisB: new CANNON.Vec3(1, 0, 0)
+        axisA: new CANNON.Vec3(1, 0, 0),
+        axisB: new CANNON.Vec3(1, 0, 0),
+        maxForce: 1e6
     });
     world.addConstraint(constraint);
     wheelConstraints.push(constraint);
@@ -99,9 +141,9 @@ gltfLoader.load(
         atvMesh.scale.set(0.1, 0.1, 0.1);
         scene.add(atvMesh);
         atvMesh.position.copy(chassisBody.position);
-        atvMesh.position.y += 1.7; // Your favorite offset
-        atvMesh.quaternion.set(0, 0, 0, 1); // Ensure upright
-        chassisBody.quaternion.copy(atvMesh.quaternion); // Sync physics
+        atvMesh.position.y += 1.7;
+        atvMesh.quaternion.set(0, 0, 0, 1);
+        chassisBody.quaternion.copy(atvMesh.quaternion);
         console.log('ATV loaded successfully');
     },
     (progress) => console.log('Loading ATV:', progress.loaded / progress.total * 100 + '%'),
@@ -129,8 +171,8 @@ speedometer.style.background = 'rgba(0, 0, 0, 0.5)';
 speedometer.style.padding = '5px';
 document.body.appendChild(speedometer);
 
-// Camera setup (initial position behind ATV)
-camera.position.set(0, 10, -10); // Behind ATV’s back
+// Camera setup
+camera.position.set(0, 10, -30);
 camera.lookAt(0, 0, 0);
 
 // Keyboard controls
@@ -153,23 +195,24 @@ document.addEventListener('keyup', (event) => {
 });
 
 // Animation loop
+let settled = false;
 function animate() {
     requestAnimationFrame(animate);
 
     world.step(1 / 60);
 
     // Controls
-    const speed = 100; // Your preferred value
-    const turnSpeed = 1.75; // Your preferred value
-    const localDirection = new CANNON.Vec3(0, 0, -1); // Local forward (front of ATV)
+    const speed = 700; // Reduced for control
+    const turnSpeed = 1.75;
+    const localDirection = new CANNON.Vec3(0, 0, -1);
     const worldDirection = chassisBody.quaternion.vmult(localDirection);
     worldDirection.y = 0;
     worldDirection.normalize();
 
-    if (controls.forward) { // W moves away from camera (back visible)
-        chassisBody.applyForce(worldDirection.scale(-speed * 10), chassisBody.position);
-    } else if (controls.backward) { // S moves toward camera (front visible)
-        chassisBody.applyForce(worldDirection.scale(speed * 10), chassisBody.position);
+    if (controls.forward) {
+        chassisBody.applyForce(worldDirection.scale(-speed * 5), chassisBody.position);
+    } else if (controls.backward) {
+        chassisBody.applyForce(worldDirection.scale(speed * 5), chassisBody.position);
     }
 
     if (controls.left) {
@@ -177,58 +220,74 @@ function animate() {
     } else if (controls.right) {
         chassisBody.angularVelocity.y = -turnSpeed;
     } else {
-        chassisBody.angularVelocity.y *= 0.9; // Dampen when released
+        chassisBody.angularVelocity.y *= 0.9;
     }
+
+    // Fade damping after landing
+    if (chassisBody.position.y <= 0.5 && !settled) {
+        settled = true;
+        chassisBody.linearDamping = 0.5;
+        chassisBody.angularDamping = 0.5;
+    }
+
+    // Cap angular velocity during jump
+    const maxAngular = 5;
+    chassisBody.angularVelocity.x = Math.max(-maxAngular, Math.min(maxAngular, chassisBody.angularVelocity.x));
+    chassisBody.angularVelocity.y = Math.max(-maxAngular, Math.min(maxAngular, chassisBody.angularVelocity.y));
+    chassisBody.angularVelocity.z = Math.max(-maxAngular, Math.min(maxAngular, chassisBody.angularVelocity.z));
 
     if (atvMesh) {
         atvMesh.position.copy(chassisBody.position);
-        atvMesh.position.y += 1.7; // Your favorite offset
+        atvMesh.position.y += 1.7;
         atvMesh.quaternion.copy(chassisBody.quaternion);
 
-        // Dust particles (tighter timing and lower position)
+        // Dust particles
         const velocityMagnitude = Math.sqrt(chassisBody.velocity.x ** 2 + chassisBody.velocity.z ** 2);
         const positions = dustParticles.geometry.attributes.position.array;
-        if (velocityMagnitude > 0.5) { // Lower threshold for quicker start
+        if (velocityMagnitude > 0.5) {
             for (let i = 0; i < particleCount; i++) {
                 const idx = i * 3;
-                if (positions[idx + 1] < -0.4 || Math.random() < 0.2) { // Respawn faster, lower bound
-                    positions[idx] = atvMesh.position.x + (Math.random() - 0.5) * 4; // Spread horizontally
-                    positions[idx + 1] = 0 + Math.random() * 0.4; // Just above ground (y = 0 to 0.4)
-                    positions[idx + 2] = atvMesh.position.z + (Math.random() - 0.5) * 1; // Closer to ATV
+                if (positions[idx + 1] < -0.4 || Math.random() < 0.2) {
+                    positions[idx] = atvMesh.position.x + (Math.random() - 0.5) * 4;
+                    positions[idx + 1] = 0 + Math.random() * 0.4;
+                    positions[idx + 2] = atvMesh.position.z + (Math.random() - 0.5) * 1;
                 } else {
-                    positions[idx + 1] -= 0.05; // Fall
-                    positions[idx] += (Math.random() - 0.5) * 0.1; // Drift
+                    positions[idx + 1] -= 0.05;
+                    positions[idx] += (Math.random() - 0.5) * 0.1;
                     positions[idx + 2] += (Math.random() - 0.5) * 0.1;
                 }
             }
-        } else { // Reset quickly when stopped
+        } else {
             for (let i = 0; i < particleCount * 3; i += 3) {
-                positions[i + 1] -= 0.1; // Fall faster when stopped
-                if (positions[i + 1] < -0.4) positions[i + 1] = -0.4; // Clamp to ground
+                positions[i + 1] -= 0.1;
+                if (positions[i + 1] < -0.4) positions[i + 1] = -0.4;
             }
         }
         dustParticles.geometry.attributes.position.needsUpdate = true;
 
         // Speedometer
-        const speedDisplay = (velocityMagnitude * 3.6).toFixed(1); // Convert to "km/h"
+        const speedDisplay = (velocityMagnitude * 3.6).toFixed(1);
         speedometer.textContent = `Speed: ${speedDisplay} km/h`;
 
-        // Camera follow (behind ATV’s back)
-        const cameraOffset = new THREE.Vector3(0, 5, -10); // Up 5, behind 10
+        // Camera follow
+        const cameraOffset = new THREE.Vector3(0, 5, -10);
         const atvPosition = new THREE.Vector3().copy(atvMesh.position);
         const atvQuaternion = new THREE.Quaternion().copy(atvMesh.quaternion);
         cameraOffset.applyQuaternion(atvQuaternion);
         const targetCameraPosition = atvPosition.add(cameraOffset);
-
-        camera.position.lerp(targetCameraPosition, 0.1);
+        camera.position.lerp(targetCameraPosition, 0.05);
         camera.lookAt(atvMesh.position);
     }
 
-    // Reset if ATV falls too far
-    if (chassisBody.position.y < -10) {
-        chassisBody.position.set(0, 3, 0);
+    // Reset if ATV falls too far or flies too high
+    if (chassisBody.position.y < -10 || chassisBody.position.y > 50) {
+        chassisBody.position.set(0, 5, -20);
         chassisBody.velocity.set(0, 0, 0);
         chassisBody.angularVelocity.set(0, 0, 0);
+        chassisBody.quaternion.set(0, 0, 0, 1);
+        settled = false;
+        chassisBody.linearDamping = 0.9;
+        chassisBody.angularDamping = 0.9;
         console.log('ATV reset to starting position');
     }
 
