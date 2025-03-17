@@ -171,34 +171,19 @@ fontLoader.load(
     (font) => {
         const textMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
-        // Number 4 for Original Jump
-        const originalTextGeometry = new THREE.TextGeometry('4', {
-            font: font,
-            size: 5,
-            height: 0.5,
-        });
+        const originalTextGeometry = new THREE.TextGeometry('4', { font, size: 5, height: 0.5 });
         const originalTextMesh = new THREE.Mesh(originalTextGeometry, textMaterial);
         originalTextMesh.position.set(215, 7, -50);
         originalTextMesh.rotation.y = 0;
         scene.add(originalTextMesh);
 
-        // Number 1 for Medium Jump
-        const mediumTextGeometry = new THREE.TextGeometry('1', {
-            font: font,
-            size: 5,
-            height: 0.5,
-        });
+        const mediumTextGeometry = new THREE.TextGeometry('1', { font, size: 5, height: 0.5 });
         const mediumTextMesh = new THREE.Mesh(mediumTextGeometry, textMaterial);
         mediumTextMesh.position.set(-5, 6, 230);
         mediumTextMesh.rotation.y = Math.PI;
         scene.add(mediumTextMesh);
 
-        // Number 3 for New Large Jump
-        const largeTextGeometry = new THREE.TextGeometry('3', {
-            font: font,
-            size: 5,
-            height: 0.5,
-        });
+        const largeTextGeometry = new THREE.TextGeometry('3', { font, size: 5, height: 0.5 });
         const largeTextMesh = new THREE.Mesh(largeTextGeometry, textMaterial);
         largeTextMesh.position.set(-5, 7, -230);
         largeTextMesh.rotation.y = 0;
@@ -266,12 +251,6 @@ world.step(1 / 60);
 
 // Load ATV model
 let atvMesh;
-let wheelMeshes = {
-    frontLeft: null,
-    frontRight: null,
-    rearLeft: null,
-    rearRight: null
-};
 const gltfLoader = new THREE.GLTFLoader();
 gltfLoader.load(
     'models/atv/scene.gltf',
@@ -281,22 +260,8 @@ gltfLoader.load(
         scene.add(atvMesh);
         atvMesh.position.copy(chassisBody.position);
         atvMesh.position.y += 1.7;
-        atvMesh.quaternion.set(0, 0, 0, 1);
-        chassisBody.quaternion.copy(atvMesh.quaternion);
+        atvMesh.quaternion.copy(chassisBody.quaternion);
         console.log('ATV loaded successfully');
-
-        // Identify wheel meshes by position relative to chassis (after scaling)
-        atvMesh.traverse((node) => {
-            if (node.isMesh) {
-                const localPos = node.position.clone().multiplyScalar(0.1); // Apply scale factor
-                // Assuming wheels are at roughly these positions relative to chassis center
-                if (Math.abs(localPos.x + 1.5) < 0.5 && Math.abs(localPos.z + 1) < 0.5) wheelMeshes.frontLeft = node;
-                if (Math.abs(localPos.x - 1.5) < 0.5 && Math.abs(localPos.z + 1) < 0.5) wheelMeshes.frontRight = node;
-                if (Math.abs(localPos.x + 1.5) < 0.5 && Math.abs(localPos.z - 1) < 0.5) wheelMeshes.rearLeft = node;
-                if (Math.abs(localPos.x - 1.5) < 0.5 && Math.abs(localPos.z - 1) < 0.5) wheelMeshes.rearRight = node;
-            }
-        });
-        console.log('Wheel meshes identified:', wheelMeshes);
     },
     (progress) => console.log('Loading ATV:', progress.loaded / progress.total * 100 + '%'),
     (error) => console.error('ATV loading failed:', error)
@@ -328,11 +293,7 @@ gltfLoader.load(
 
         for (let i = 0; i < 10; i++) {
             const tireClone = tireMesh.clone();
-            tireClone.position.set(
-                (Math.random() - 0.5) * 600,
-                0,
-                (Math.random() - 0.5) * 600
-            );
+            tireClone.position.set((Math.random() - 0.5) * 600, 0, (Math.random() - 0.5) * 600);
             tireClone.scale.set(5, 5, 5);
             if (Math.abs(tireClone.position.x) > 250 || Math.abs(tireClone.position.z) > 250) {
                 scene.add(tireClone);
@@ -344,11 +305,7 @@ gltfLoader.load(
             }
 
             const barrelClone = barrelMesh.clone();
-            barrelClone.position.set(
-                (Math.random() - 0.5) * 600,
-                0,
-                (Math.random() - 0.5) * 600
-            );
+            barrelClone.position.set((Math.random() - 0.5) * 600, 0, (Math.random() - 0.5) * 600);
             barrelClone.scale.set(5, 5, 5);
             if (Math.abs(barrelClone.position.x) > 250 || Math.abs(barrelClone.position.z) > 250) {
                 scene.add(barrelClone);
@@ -362,11 +319,7 @@ gltfLoader.load(
 
         for (let i = 0; i < 5; i++) {
             const barrelClone = barrelMesh.clone();
-            barrelClone.position.set(
-                (Math.random() - 0.5) * 300,
-                0,
-                (Math.random() - 0.5) * 300
-            );
+            barrelClone.position.set((Math.random() - 0.5) * 300, 0, (Math.random() - 0.5) * 300);
             barrelClone.scale.set(5, 5, 5);
             const distX = Math.abs(barrelClone.position.x);
             const distZ = Math.abs(barrelClone.position.z);
@@ -449,14 +402,11 @@ document.addEventListener('keyup', (event) => {
 
 // Animation loop
 let settled = false;
-let wheelRotationX = 0; // Cumulative rotation for rolling
-const wheelRadius = 0.5; // Matches physics wheel size
 function animate() {
     requestAnimationFrame(animate);
 
     world.step(1 / 60);
 
-    // Controls
     const speed = 1200;
     const turnSpeed = 1.75;
     const localDirection = new CANNON.Vec3(0, 0, -1);
@@ -478,14 +428,12 @@ function animate() {
         chassisBody.angularVelocity.y *= 0.9;
     }
 
-    // Fade damping after landing
     if (chassisBody.position.y <= 0.5 && !settled) {
         settled = true;
         chassisBody.linearDamping = 0.5;
         chassisBody.angularDamping = 0.5;
     }
 
-    // Cap angular velocity
     const maxAngular = 5;
     chassisBody.angularVelocity.x = Math.max(-maxAngular, Math.min(maxAngular, chassisBody.angularVelocity.x));
     chassisBody.angularVelocity.y = Math.max(-maxAngular, Math.min(maxAngular, chassisBody.angularVelocity.y));
@@ -496,28 +444,8 @@ function animate() {
         atvMesh.position.y += 1.7;
         atvMesh.quaternion.copy(chassisBody.quaternion);
 
-        // Wheel rotation
-        const velocityMagnitude = Math.sqrt(chassisBody.velocity.x ** 2 + chassisBody.velocity.z ** 2);
-        const rollSpeed = velocityMagnitude / wheelRadius; // Angular velocity in radians/sec
-        const deltaTime = 1 / 60; // Fixed timestep
-        wheelRotationX += rollSpeed * deltaTime * (controls.forward ? 1 : controls.backward ? -1 : 0);
-
-        const steeringAngle = controls.left ? -Math.PI / 6 : controls.right ? Math.PI / 6 : 0; // Max 30 degrees
-
-        if (wheelMeshes.frontLeft) {
-            wheelMeshes.frontLeft.rotation.set(wheelRotationX, steeringAngle, 0, 'XYZ');
-        }
-        if (wheelMeshes.frontRight) {
-            wheelMeshes.frontRight.rotation.set(wheelRotationX, steeringAngle, 0, 'XYZ');
-        }
-        if (wheelMeshes.rearLeft) {
-            wheelMeshes.rearLeft.rotation.set(wheelRotationX, 0, 0, 'XYZ');
-        }
-        if (wheelMeshes.rearRight) {
-            wheelMeshes.rearRight.rotation.set(wheelRotationX, 0, 0, 'XYZ');
-        }
-
         // Dust particles
+        const velocityMagnitude = Math.sqrt(chassisBody.velocity.x ** 2 + chassisBody.velocity.z ** 2);
         const positions = dustParticles.geometry.attributes.position.array;
         if (velocityMagnitude > 0.5) {
             for (let i = 0; i < particleCount; i++) {
@@ -540,11 +468,9 @@ function animate() {
         }
         dustParticles.geometry.attributes.position.needsUpdate = true;
 
-        // Speedometer
         const speedDisplay = (velocityMagnitude * 3.6).toFixed(1);
         speedometer.textContent = `Speed: ${speedDisplay} km/h`;
 
-        // Camera follow
         const cameraOffset = new THREE.Vector3(0, 5, -10);
         const atvPosition = new THREE.Vector3().copy(atvMesh.position);
         const atvQuaternion = new THREE.Quaternion().copy(atvMesh.quaternion);
@@ -553,13 +479,11 @@ function animate() {
         camera.position.lerp(targetCameraPosition, 0.05);
         camera.lookAt(atvMesh.position);
 
-        // Update skybox position
         if (skybox) {
             skybox.position.copy(camera.position);
         }
     }
 
-    // Reset if needed
     if (chassisBody.position.y < -10 || chassisBody.position.y > 50) {
         chassisBody.position.set(230, 0.6, 0);
         chassisBody.velocity.set(0, 0, 0);
