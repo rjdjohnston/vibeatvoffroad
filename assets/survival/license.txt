@@ -1,0 +1,11 @@
+Model Information:
+* title:	Assets pack (free) Survival/Postapo
+* source:	https://sketchfab.com/3d-models/assets-pack-free-survivalpostapo-834149c26d704b76af8137c73e6e000c
+* author:	ForevereQ (https://sketchfab.com/ForevereQ)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Assets pack (free) Survival/Postapo" (https://sketchfab.com/3d-models/assets-pack-free-survivalpostapo-834149c26d704b76af8137c73e6e000c) by ForevereQ (https://sketchfab.com/ForevereQ) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
