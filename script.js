@@ -230,6 +230,7 @@ function createTrackPhysics(trackModel) {
     });
     const debugMesh = new THREE.Mesh(debugGeometry, debugMaterial);
     debugMesh.position.copy(trackPhysicsBody.position);
+    debugMesh.visible = false; // Hide the red track boundary
     scene.add(debugMesh);
     
     // Also add debug visualizations for the walls
@@ -244,24 +245,28 @@ function createTrackPhysics(trackModel) {
     const northWallGeo = new THREE.BoxGeometry(trackWidth * 2, wallHeight * 2, wallThickness * 2);
     const northWallDebug = new THREE.Mesh(northWallGeo, wallMaterial);
     northWallDebug.position.copy(northWallBody.position);
+    northWallDebug.visible = false; // Hide the green wall boundary
     scene.add(northWallDebug);
     
     // South wall debug
     const southWallGeo = new THREE.BoxGeometry(trackWidth * 2, wallHeight * 2, wallThickness * 2);
     const southWallDebug = new THREE.Mesh(southWallGeo, wallMaterial);
     southWallDebug.position.copy(southWallBody.position);
+    southWallDebug.visible = false; // Hide the green wall boundary
     scene.add(southWallDebug);
     
     // East wall debug
     const eastWallGeo = new THREE.BoxGeometry(wallThickness * 2, wallHeight * 2, trackLength * 2);
     const eastWallDebug = new THREE.Mesh(eastWallGeo, wallMaterial);
     eastWallDebug.position.copy(eastWallBody.position);
+    eastWallDebug.visible = false; // Hide the green wall boundary
     scene.add(eastWallDebug);
     
     // West wall debug
     const westWallGeo = new THREE.BoxGeometry(wallThickness * 2, wallHeight * 2, trackLength * 2);
     const westWallDebug = new THREE.Mesh(westWallGeo, wallMaterial);
     westWallDebug.position.copy(westWallBody.position);
+    westWallDebug.visible = false; // Hide the green wall boundary
     scene.add(westWallDebug);
     
     // Add ramps to the track with a much simpler implementation
