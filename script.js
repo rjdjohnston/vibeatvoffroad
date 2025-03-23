@@ -353,16 +353,16 @@ function createTrackPhysics(trackModel) {
     // Create the four ramps - make the angles more gradual and heights lower
     // createRamp(x, z, width, height, depth, angle, axis, color)
     // North ramp (red) - more gradual approach
-    createRamp(0, 50, 40, 15, 50, Math.PI/12, 'x', 0xFF0000);
+    createRamp(0, 680, 40, 15, 50, Math.PI/12, 'x', 0xFF0000);
     
     // East ramp (green) - more gradual approach
-    createRamp(50, 0, 30, 15, 50, Math.PI/12, 'z', 0x00FF00);
+    createRamp(150, 220, 30, 15, 50, Math.PI/12, 'z', 0x00FF00);
     
     // South ramp (blue) - more gradual approach
-    createRamp(0, -50, 40, 15, 50, Math.PI/12, 'x', 0x0000FF);
+    createRamp(0, -500, 40, 15, 50, Math.PI/12, 'z', 0x0000FF);
     
     // West ramp (yellow) - more gradual approach
-    createRamp(-50, 0, 30, 15, 50, Math.PI/12, 'z', 0xFFFF00);
+    createRamp(-50, -50, 30, 15, 50, Math.PI/12, 'z', 0xFFFF00);
     
     console.log("Track physics created");
 }
