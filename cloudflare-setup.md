@@ -43,24 +43,32 @@ This guide explains how to set up Cloudflare to handle HTTPS encryption for your
 #### SSL/TLS Settings
 
 1. Go to the SSL/TLS tab
-2. Set the SSL/TLS encryption mode to "Full" (recommended) or "Flexible"
-   - "Full" requires your origin server to have HTTPS enabled (recommended)
-   - "Full (strict)" requires a valid certificate on your origin server
+2. Set the SSL/TLS encryption mode to "Flexible" (recommended)
    - "Flexible" doesn't require HTTPS on your origin server but is less secure
 
 3. Under Edge Certificates, enable:
    - Always Use HTTPS
    - Automatic HTTPS Rewrites
 
-#### Rules Settings
+#### Network Settings
 
-1. Go to the Rules tab and create a Page Rule:
+1. Go to the Network tab
+2. Under WebSockets, ensure it's set to "On" (WebSockets are enabled by default)
+3. Set HTTP/2 to "On"
+4. Set HTTP/3 (QUIC) to "On"
+
+#### Cache Settings
+
+1. Go to the Caching tab and under the Configuration section:
+   - Set the Browser Cache TTL to a lower value (e.g., 30 minutes) for dynamic game content
+   
+2. Create a Page Rule for WebSocket traffic:
    - URL pattern: `*yourdomain.com/socket.io/*`
-   - Setting: "WebSockets"
-   - Value: "On"
+   - Setting: "Cache Level"
+   - Value: "Bypass"
 
-2. Create another Page Rule for WebSocket traffic:
-   - URL pattern: `*yourdomain.com/*`
+3. Create another Page Rule for your API endpoints (if any):
+   - URL pattern: `*yourdomain.com/api/*`
    - Setting: "Cache Level"
    - Value: "Bypass"
 
@@ -98,17 +106,25 @@ If you see mixed content warnings:
 
 ## Cloudflare SSL Modes Explained
 
-### Flexible SSL
+### Flexible SSL (Recommended for Vibe ATV Off-road)
 
 - Cloudflare ↔ Visitors: HTTPS
 - Cloudflare ↔ Origin: HTTP
-- Easiest to set up but least secure
+- **Key Benefit**: No certificates needed on your origin server
+- **Configuration**: Empty `SSL_KEY_PATH` and `SSL_CERT_PATH` in docker-compose.yml
+- **Best For**: Simplest setup with good security for most multiplayer games
+
+This is the recommended setup for Vibe ATV Off-road as it provides:
+- Encrypted connections for players
+- Simplest configuration (no certificate management)
+- Works immediately with your existing Docker setup
 
 ### Full SSL
 
 - Cloudflare ↔ Visitors: HTTPS
 - Cloudflare ↔ Origin: HTTPS
 - Origin needs SSL certificate (can be self-signed)
+- Requires certificate files in your server
 - Good balance of security and ease of setup
 
 ### Full (Strict) SSL
@@ -117,5 +133,14 @@ If you see mixed content warnings:
 - Cloudflare ↔ Origin: HTTPS with valid certificate
 - Most secure option
 - Requires valid certificate on origin server
+- Recommended only for applications handling sensitive data
 
-The recommended setting is **Full SSL**, which works with your self-signed certificates while maintaining security.
+## Recommended Setup: Flexible SSL
+
+We've configured your application to work best with Cloudflare's Flexible SSL mode:
+
+1. No local certificates required
+2. Docker environment configured with empty SSL paths
+3. Server code updated to handle this configuration
+
+This approach ensures your multiplayer game remains fast and responsive while still protecting player connections with HTTPS. All the game's unique features (extreme tilting physics, colorful ramps) will work seamlessly through Cloudflare's proxy.

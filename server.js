@@ -34,12 +34,18 @@ let server;
 
 // Create either HTTP or HTTPS server based on certificate availability
 if (SSL_KEY_PATH && SSL_CERT_PATH && fs.existsSync(SSL_KEY_PATH) && fs.existsSync(SSL_CERT_PATH)) {
-  const sslOptions = {
-    key: fs.readFileSync(SSL_KEY_PATH),
-    cert: fs.readFileSync(SSL_CERT_PATH)
-  };
-  server = https.createServer(sslOptions, app);
-  console.log('Using HTTPS server with SSL certificates');
+  try {
+    const sslOptions = {
+      key: fs.readFileSync(SSL_KEY_PATH),
+      cert: fs.readFileSync(SSL_CERT_PATH)
+    };
+    server = https.createServer(sslOptions, app);
+    console.log('Using HTTPS server with SSL certificates');
+  } catch (error) {
+    console.error('Error reading SSL certificates:', error.message);
+    console.log('Falling back to HTTP server');
+    server = http.createServer(app);
+  }
 } else {
   server = http.createServer(app);
   console.log('Using HTTP server - SSL certificates not found or not using direct SSL (Cloudflare handles SSL)');

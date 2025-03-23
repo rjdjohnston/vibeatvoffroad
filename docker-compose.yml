@@ -10,16 +10,15 @@ services:
     volumes:
       - ./:/app
       - /app/node_modules
-      # With Cloudflare's SSL, you can use HTTP between Cloudflare and your origin
-      # so these certificates are optional when using Cloudflare's Full (not strict) mode
-      - ./certs/server.key:/app/certs/server.key
-      - ./certs/server.crt:/app/certs/server.crt
+      # Using Cloudflare Flexible SSL, we don't need certificates on the origin server
+      # - ./certs/server.key:/app/certs/server.key
+      # - ./certs/server.crt:/app/certs/server.crt
     environment:
       - NODE_ENV=production
       - PORT=8090
-      # These environment variables are still useful if you want to use Cloudflare's Full Strict mode
-      - SSL_KEY_PATH=/app/certs/server.key
-      - SSL_CERT_PATH=/app/certs/server.crt
+      # With Flexible SSL, we're telling the server not to look for certificates
+      - SSL_KEY_PATH=
+      - SSL_CERT_PATH=
       # Add Cloudflare-specific environment variable
       - USING_CLOUDFLARE=true
     restart: unless-stopped
