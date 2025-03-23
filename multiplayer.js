@@ -69,6 +69,9 @@ class MultiplayerManager {
         // Clone the local ATV model for other players
         const playerMesh = this.localVehicleMesh.clone();
         
+        // Convert hex color to THREE.js color
+        const playerColor = new THREE.Color(playerInfo.color);
+        
         // Apply a unique color tint to differentiate players
         playerMesh.traverse(function(object) {
             if (object.isMesh && object.material) {
@@ -76,11 +79,23 @@ class MultiplayerManager {
                 if (Array.isArray(object.material)) {
                     object.material = object.material.map(mat => mat.clone());
                     object.material.forEach(mat => {
-                        mat.emissive = new THREE.Color(playerInfo.color).multiplyScalar(0.2);
+                        // Apply more distinct coloring
+                        mat.color.set(playerColor);
+                        mat.emissive.set(playerColor).multiplyScalar(0.4); // Stronger emissive effect
+                        mat.opacity = 0.9;  // Slightly more opaque
+                        if (!mat.transparent) {
+                            mat.transparent = true;
+                        }
                     });
                 } else {
                     object.material = object.material.clone();
-                    object.material.emissive = new THREE.Color(playerInfo.color).multiplyScalar(0.2);
+                    // Apply more distinct coloring
+                    object.material.color.set(playerColor);
+                    object.material.emissive.set(playerColor).multiplyScalar(0.4); // Stronger emissive effect
+                    object.material.opacity = 0.9;  // Slightly more opaque
+                    if (!object.material.transparent) {
+                        object.material.transparent = true;
+                    }
                 }
             }
         });

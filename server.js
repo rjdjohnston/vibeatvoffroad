@@ -66,6 +66,19 @@ server.listen(PORT, '0.0.0.0', () => {
 
 // Helper function to generate random color for players
 function getRandomColor() {
-  const colors = [0xFF5733, 0x33FF57, 0x3357FF, 0xF3FF33, 0xFF33F3, 0x33FFF3];
+  const colors = [
+    0xFF5733, // Coral
+    0x33FF57, // Lime Green
+    0x3357FF, // Royal Blue
+    0xF3FF33, // Yellow
+    0xFF33F3, // Magenta
+    0x33FFF3, // Cyan
+    0xFF3366, // Pink
+    0x9933FF, // Purple
+    0xFF9933, // Orange
+    0x33FF99, // Mint
+    0x3399FF, // Sky Blue
+    0xFFFF66  // Light Yellow
+  ];
   return colors[Math.floor(Math.random() * colors.length)];
 }
