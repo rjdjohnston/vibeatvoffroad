@@ -149,8 +149,10 @@ function createTrackPhysics(trackModel) {
     );
     
     // Calculate track dimensions from the actual bounding box
-    const trackWidth = (maxX - minX) / 2;
-    const trackLength = (maxZ - minZ) / 2;
+    // Expand the size by a multiplier to ensure it covers the visual area
+    const sizeMultiplier = 5.0; // Make the collider twice as large
+    const trackWidth = (maxX - minX) / 2 * sizeMultiplier;
+    const trackLength = (maxZ - minZ) / 2 * sizeMultiplier;
     const trackHeight = 1;  // Keep this relatively thin
     
     // Calculate the center position
@@ -168,8 +170,8 @@ function createTrackPhysics(trackModel) {
     trackCollider = trackPhysicsBody;
     
     console.log("Added main track collider with dimensions:", 
-        "Width:", trackWidth * 2, 
-        "Length:", trackLength * 2,
+        "Width:", trackWidth * 6, 
+        "Length:", trackLength * 6,
         "Position:", trackPhysicsBody.position
     );
     
@@ -177,47 +179,90 @@ function createTrackPhysics(trackModel) {
     const wallHeight = 5;
     const wallThickness = 1;
     
+    // Use the expanded bounds for wall placement
+    const wallX = maxX * sizeMultiplier;
+    const wallZ = maxZ * sizeMultiplier;
+    const negWallX = minX * sizeMultiplier;
+    const negWallZ = minZ * sizeMultiplier;
+    
     // North wall (Z max)
     const northWallShape = new CANNON.Box(new CANNON.Vec3(trackWidth, wallHeight, wallThickness));
     const northWallBody = new CANNON.Body({ mass: 0, material: groundMaterial });
     northWallBody.addShape(northWallShape);
-    northWallBody.position.set(centerX, centerY + wallHeight, maxZ);
+    northWallBody.position.set(centerX, centerY + wallHeight, wallZ);
     world.addBody(northWallBody);
     
     // South wall (Z min)
     const southWallShape = new CANNON.Box(new CANNON.Vec3(trackWidth, wallHeight, wallThickness));
     const southWallBody = new CANNON.Body({ mass: 0, material: groundMaterial });
     southWallBody.addShape(southWallShape);
-    southWallBody.position.set(centerX, centerY + wallHeight, minZ);
+    southWallBody.position.set(centerX, centerY + wallHeight, negWallZ);
     world.addBody(southWallBody);
     
     // East wall (X max)
     const eastWallShape = new CANNON.Box(new CANNON.Vec3(wallThickness, wallHeight, trackLength));
     const eastWallBody = new CANNON.Body({ mass: 0, material: groundMaterial });
     eastWallBody.addShape(eastWallShape);
-    eastWallBody.position.set(maxX, centerY + wallHeight, centerZ);
+    eastWallBody.position.set(wallX, centerY + wallHeight, centerZ);
     world.addBody(eastWallBody);
     
     // West wall (X min)
     const westWallShape = new CANNON.Box(new CANNON.Vec3(wallThickness, wallHeight, trackLength));
     const westWallBody = new CANNON.Body({ mass: 0, material: groundMaterial });
     westWallBody.addShape(westWallShape);
-    westWallBody.position.set(minX, centerY + wallHeight, centerZ);
+    westWallBody.position.set(negWallX, centerY + wallHeight, centerZ);
     world.addBody(westWallBody);
     
     console.log("Added wall colliders at edges:", 
-        "North:", maxZ, 
-        "South:", minZ, 
-        "East:", maxX, 
-        "West:", minX
+        "North:", wallZ, 
+        "South:", negWallZ, 
+        "East:", wallX, 
+        "West:", negWallX
     );
     
     // Create a debug visual to see the physics shape
     const debugGeometry = new THREE.BoxGeometry(trackWidth * 2, trackHeight * 2, trackLength * 2);
-    const debugMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true });
+    const debugMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0xff0000, 
+        wireframe: true,
+        opacity: 0.5,
+        transparent: true
+    });
     const debugMesh = new THREE.Mesh(debugGeometry, debugMaterial);
     debugMesh.position.copy(trackPhysicsBody.position);
     scene.add(debugMesh);
+    
+    // Also add debug visualizations for the walls
+    const wallMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x00ff00, 
+        wireframe: true,
+        opacity: 0.3,
+        transparent: true
+    });
+    
+    // North wall debug
+    const northWallGeo = new THREE.BoxGeometry(trackWidth * 2, wallHeight * 2, wallThickness * 2);
+    const northWallDebug = new THREE.Mesh(northWallGeo, wallMaterial);
+    northWallDebug.position.copy(northWallBody.position);
+    scene.add(northWallDebug);
+    
+    // South wall debug
+    const southWallGeo = new THREE.BoxGeometry(trackWidth * 2, wallHeight * 2, wallThickness * 2);
+    const southWallDebug = new THREE.Mesh(southWallGeo, wallMaterial);
+    southWallDebug.position.copy(southWallBody.position);
+    scene.add(southWallDebug);
+    
+    // East wall debug
+    const eastWallGeo = new THREE.BoxGeometry(wallThickness * 2, wallHeight * 2, trackLength * 2);
+    const eastWallDebug = new THREE.Mesh(eastWallGeo, wallMaterial);
+    eastWallDebug.position.copy(eastWallBody.position);
+    scene.add(eastWallDebug);
+    
+    // West wall debug
+    const westWallGeo = new THREE.BoxGeometry(wallThickness * 2, wallHeight * 2, trackLength * 2);
+    const westWallDebug = new THREE.Mesh(westWallGeo, wallMaterial);
+    westWallDebug.position.copy(westWallBody.position);
+    scene.add(westWallDebug);
     
     console.log("Track physics created");
 }
@@ -242,7 +287,7 @@ chassisBody.velocity.set(0, 0, 0);
 chassisBody.angularVelocity.set(0, 0, 0);
 chassisBody.quaternion.set(0, 0, 0, 1);
 chassisBody.linearDamping = 0.7; // Less linear damping for smoother movement
-chassisBody.angularDamping = 0.8;  // Reduced to allow some tilting while still providing stability
+chassisBody.angularDamping = 0.02;  // Reduced to allow some tilting while still providing stability
 world.addBody(chassisBody);
 
 // Wheels physics
@@ -468,16 +513,41 @@ function animate() {
     worldDirection.y = 0;
     worldDirection.normalize();
 
+    // Get current velocity for lean calculations
+    const currentVelocity = chassisBody.velocity.length();
+    
     // Simplify force application - apply directly to center of mass
     if (controls.forward) {
         chassisBody.applyForce(worldDirection.scale(-speed * 5), chassisBody.position);
     } else if (controls.backward) {
-        chassisBody.applyForce(worldDirection.scale(speed * 5), chassisBody.position);
+        chassisBody.applyForce(worldDirection.scale(speed * 3), chassisBody.position); // Less power for reverse
     }
 
     if (controls.left) {
+        // Add leaning effect when turning left at speed
+        if (currentVelocity > 5) {
+            // Create a force that pushes the ATV to lean into the turn
+            const leanDirection = new CANNON.Vec3(-1, 0, 0); // Left lean
+            const worldLeanDir = chassisBody.quaternion.vmult(leanDirection);
+            worldLeanDir.y = 0;
+            worldLeanDir.normalize();
+            // Apply lean force - stronger at higher speeds
+            const leanFactor = Math.min(currentVelocity * 25, 500);
+            chassisBody.applyForce(worldLeanDir.scale(leanFactor), chassisBody.position);
+        }
         chassisBody.angularVelocity.y = turnSpeed;
     } else if (controls.right) {
+        // Add leaning effect when turning right at speed
+        if (currentVelocity > 5) {
+            // Create a force that pushes the ATV to lean into the turn
+            const leanDirection = new CANNON.Vec3(1, 0, 0); // Right lean
+            const worldLeanDir = chassisBody.quaternion.vmult(leanDirection);
+            worldLeanDir.y = 0;
+            worldLeanDir.normalize();
+            // Apply lean force - stronger at higher speeds
+            const leanFactor = Math.min(currentVelocity * 0.5, 500);
+            chassisBody.applyForce(worldLeanDir.scale(leanFactor), chassisBody.position);
+        }
         chassisBody.angularVelocity.y = -turnSpeed;
     } else {
         chassisBody.angularVelocity.y *= 0.9;
