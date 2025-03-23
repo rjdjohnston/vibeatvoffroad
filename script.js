@@ -6,6 +6,9 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setClearColor(0x0000ff); // Blue background (fallback)
 document.body.appendChild(renderer.domElement);
 
+// Multiplayer manager
+let multiplayerManager = null;
+
 // Physics world
 const world = new CANNON.World();
 world.gravity.set(0, -15.82, 0);
@@ -428,6 +431,13 @@ gltfLoader.load(
         atvMesh.position.y += 1.7;
         atvMesh.quaternion.copy(chassisBody.quaternion);
         console.log('ATV loaded successfully');
+        
+        // Initialize multiplayer after ATV is loaded
+        multiplayerManager = new MultiplayerManager(scene, chassisBody, atvMesh);
+        multiplayerManager.init();
+        
+        // Create player list element
+        createPlayerListUI();
     },
     (progress) => console.log('Loading ATV:', progress.loaded / progress.total * 100 + '%'),
     (error) => console.error('ATV loading failed:', error)
@@ -714,6 +724,12 @@ function animate() {
     }
 
     renderer.render(scene, camera);
+    
+    // Update multiplayer
+    if (multiplayerManager) {
+        multiplayerManager.update();
+        updatePlayerListUI();
+    }
 }
 animate();
 
@@ -723,3 +739,48 @@ window.addEventListener('resize', () => {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+// Create player list UI
+function createPlayerListUI() {
+    const playerList = document.createElement('div');
+    playerList.id = 'player-list';
+    playerList.style.position = 'absolute';
+    playerList.style.top = '10px';
+    playerList.style.right = '10px';
+    playerList.style.color = 'white';
+    playerList.style.background = 'rgba(0, 0, 0, 0.5)';
+    playerList.style.padding = '10px';
+    playerList.style.borderRadius = '5px';
+    playerList.style.fontSize = '14px';
+    playerList.innerHTML = '<h3 style="margin: 0 0 5px 0">Players</h3><div id="player-entries"></div>';
+    document.body.appendChild(playerList);
+}
+
+// Update player list UI
+function updatePlayerListUI() {
+    if (!multiplayerManager) return;
+    
+    const playerEntries = document.getElementById('player-entries');
+    if (!playerEntries) return;
+    
+    // Clear existing entries
+    playerEntries.innerHTML = '';
+    
+    // Add local player entry
+    const localPlayerEntry = document.createElement('div');
+    localPlayerEntry.style.marginBottom = '5px';
+    localPlayerEntry.innerHTML = `<span style="color: #FFFF00">You</span>`;
+    playerEntries.appendChild(localPlayerEntry);
+    
+    // Add entries for other players
+    Object.keys(multiplayerManager.players).forEach(id => {
+        const playerEntry = document.createElement('div');
+        playerEntry.style.marginBottom = '5px';
+        
+        // Get player color as hex string
+        const color = '#' + multiplayerManager.players[id].color.toString(16).padStart(6, '0');
+        
+        playerEntry.innerHTML = `<span style="color: ${color}">Player ${id.substring(0, 4)}</span>`;
+        playerEntries.appendChild(playerEntry);
+    });
+}
