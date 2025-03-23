@@ -9,4 +9,5 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=production
+      - PORT=8090
     restart: unless-stopped
