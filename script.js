@@ -36,6 +36,11 @@ scene.add(directionalLight);
 
 // Loaders
 const textureLoader = new THREE.TextureLoader();
+const gltfLoader = new THREE.GLTFLoader();
+
+// Track variables
+let trackMesh;
+let trackCollider;
 
 // Background (Desert Image JPG)
 let skybox;
@@ -59,160 +64,185 @@ textureLoader.load(
     (error) => console.error('Skybox loading failed:', error)
 );
 
-// Base terrain
-const terrainSize = 700;
-const terrainGeometry = new THREE.PlaneGeometry(terrainSize, terrainSize);
-const dirtTexture = textureLoader.load(
-    'textures/dirt.jpg',
-    (texture) => console.log('Texture loaded successfully:', texture),
-    undefined,
-    (error) => console.error('Texture loading failed:', error)
+// Load 3D Race Track Model
+console.log('Loading 3D race track model...');
+gltfLoader.load(
+    'models/tracks/drift_race_track.glb',
+    (gltf) => {
+        // Add the track to the scene
+        trackMesh = gltf.scene;
+        
+        // You may need to adjust scale based on your model
+        trackMesh.scale.set(5, 5, 5);
+        
+        // You may need to adjust position based on your model
+        trackMesh.position.set(0, -1, 0);
+        
+        // You may need to adjust rotation based on your model
+        // trackMesh.rotation.y = Math.PI / 2;
+        
+        // Add to scene
+        scene.add(trackMesh);
+        
+        console.log('3D track model loaded successfully:', trackMesh);
+        
+        // Add physics for the track using a simplified approach
+        createTrackPhysics(trackMesh);
+        
+        // Adjust ATV starting position to match the new track
+        if (chassisBody) {
+            chassisBody.position.set(0, 10, 0); // Increased height for safety
+            chassisBody.velocity.set(0, 0, 0);
+            chassisBody.angularVelocity.set(0, 0, 0);
+            chassisBody.quaternion.set(0, 0, 0, 1);
+        }
+    },
+    (progress) => console.log('Loading 3D track progress:', progress.loaded / progress.total * 100 + '%'),
+    (error) => console.error('3D track loading failed:', error)
 );
-dirtTexture.wrapS = dirtTexture.wrapT = THREE.RepeatWrapping;
-dirtTexture.repeat.set(5, 5);
-const terrainMaterial = new THREE.MeshPhongMaterial({ map: dirtTexture });
-const terrainMesh = new THREE.Mesh(terrainGeometry, terrainMaterial);
-terrainMesh.rotation.x = -Math.PI / 2;
-terrainMesh.position.set(0, 0, 0);
-scene.add(terrainMesh);
 
-// Physics terrain
-const groundShape = new CANNON.Plane();
+// Function to create physics for the track
+function createTrackPhysics(trackModel) {
+    console.log("Creating physics for track model");
+    
+    // First, we'll create a series of box colliders that approximate the track surface
+    // This is more reliable than trying to create a trimesh from the complex geometry
+    
+    // Create main track body
+    const trackPhysicsBody = new CANNON.Body({
+        mass: 0,
+        material: groundMaterial
+    });
+    
+    // These variables will store the bounding box of the track to help us create physics
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    
+    // Traverse the model to find its bounding box dimensions
+    trackModel.traverse((child) => {
+        if (child.isMesh && child.geometry) {
+            child.geometry.computeBoundingBox();
+            const boundingBox = child.geometry.boundingBox;
+            
+            // Transform bounding box by the mesh's world matrix
+            child.updateMatrixWorld(true);
+            boundingBox.applyMatrix4(child.matrixWorld);
+            
+            // Update min/max values
+            minX = Math.min(minX, boundingBox.min.x);
+            maxX = Math.max(maxX, boundingBox.max.x);
+            minY = Math.min(minY, boundingBox.min.y);
+            maxY = Math.max(maxY, boundingBox.max.y);
+            minZ = Math.min(minZ, boundingBox.min.z);
+            maxZ = Math.max(maxZ, boundingBox.max.z);
+        }
+    });
+    
+    console.log("Track bounding box:", 
+        "X:", minX, "to", maxX,
+        "Y:", minY, "to", maxY,
+        "Z:", minZ, "to", maxZ
+    );
+    
+    // Calculate track dimensions from the actual bounding box
+    const trackWidth = (maxX - minX) / 2;
+    const trackLength = (maxZ - minZ) / 2;
+    const trackHeight = 1;  // Keep this relatively thin
+    
+    // Calculate the center position
+    const centerX = (maxX + minX) / 2;
+    const centerZ = (maxZ + minZ) / 2;
+    const centerY = minY; // Use the bottom of the track as the y-position
+    
+    // Create a main platform as a base collider with the actual dimensions
+    const baseShape = new CANNON.Box(new CANNON.Vec3(trackWidth, trackHeight, trackLength));
+    trackPhysicsBody.addShape(baseShape);
+    
+    // Position the track collider at the calculated center
+    trackPhysicsBody.position.set(centerX, centerY, centerZ);
+    world.addBody(trackPhysicsBody);
+    trackCollider = trackPhysicsBody;
+    
+    console.log("Added main track collider with dimensions:", 
+        "Width:", trackWidth * 2, 
+        "Length:", trackLength * 2,
+        "Position:", trackPhysicsBody.position
+    );
+    
+    // Create invisible walls around the track to keep the ATV from falling off
+    const wallHeight = 5;
+    const wallThickness = 1;
+    
+    // North wall (Z max)
+    const northWallShape = new CANNON.Box(new CANNON.Vec3(trackWidth, wallHeight, wallThickness));
+    const northWallBody = new CANNON.Body({ mass: 0, material: groundMaterial });
+    northWallBody.addShape(northWallShape);
+    northWallBody.position.set(centerX, centerY + wallHeight, maxZ);
+    world.addBody(northWallBody);
+    
+    // South wall (Z min)
+    const southWallShape = new CANNON.Box(new CANNON.Vec3(trackWidth, wallHeight, wallThickness));
+    const southWallBody = new CANNON.Body({ mass: 0, material: groundMaterial });
+    southWallBody.addShape(southWallShape);
+    southWallBody.position.set(centerX, centerY + wallHeight, minZ);
+    world.addBody(southWallBody);
+    
+    // East wall (X max)
+    const eastWallShape = new CANNON.Box(new CANNON.Vec3(wallThickness, wallHeight, trackLength));
+    const eastWallBody = new CANNON.Body({ mass: 0, material: groundMaterial });
+    eastWallBody.addShape(eastWallShape);
+    eastWallBody.position.set(maxX, centerY + wallHeight, centerZ);
+    world.addBody(eastWallBody);
+    
+    // West wall (X min)
+    const westWallShape = new CANNON.Box(new CANNON.Vec3(wallThickness, wallHeight, trackLength));
+    const westWallBody = new CANNON.Body({ mass: 0, material: groundMaterial });
+    westWallBody.addShape(westWallShape);
+    westWallBody.position.set(minX, centerY + wallHeight, centerZ);
+    world.addBody(westWallBody);
+    
+    console.log("Added wall colliders at edges:", 
+        "North:", maxZ, 
+        "South:", minZ, 
+        "East:", maxX, 
+        "West:", minX
+    );
+    
+    // Create a debug visual to see the physics shape
+    const debugGeometry = new THREE.BoxGeometry(trackWidth * 2, trackHeight * 2, trackLength * 2);
+    const debugMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true });
+    const debugMesh = new THREE.Mesh(debugGeometry, debugMaterial);
+    debugMesh.position.copy(trackPhysicsBody.position);
+    scene.add(debugMesh);
+    
+    console.log("Track physics created");
+}
+
+// Create a simple ground plane as fallback (positioned much lower as a safety net)
+const fallbackGroundShape = new CANNON.Plane();
 const groundBody = new CANNON.Body({ mass: 0, material: groundMaterial });
-groundBody.addShape(groundShape);
+groundBody.addShape(fallbackGroundShape);
 groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
-groundBody.position.set(0, 0, 0);
+groundBody.position.set(0, -20, 0); // Much lower as a final safety net
 world.addBody(groundBody);
 
-// Race Track Material
-const trackMaterial = new THREE.MeshPhongMaterial({ color: 0xE69138 });
-trackMaterial.needsUpdate = true;
-
-// Simple Oval Track (500x500, 40 wide)
-const trackGeometry = new THREE.RingGeometry(210, 250, 32, 1, 0, 2 * Math.PI);
-const trackMesh = new THREE.Mesh(trackGeometry, trackMaterial);
-trackMesh.rotation.x = -Math.PI / 2;
-trackMesh.position.set(0, 0.1, 0);
-scene.add(trackMesh);
-
-// Physics Oval Track
-const trackVertices = [
-    new CANNON.Vec3(-250, 0, -210),
-    new CANNON.Vec3(250, 0, -210),
-    new CANNON.Vec3(250, 0, 210),
-    new CANNON.Vec3(-250, 0, 210),
-    new CANNON.Vec3(-210, 0, -210),
-    new CANNON.Vec3(210, 0, -210),
-    new CANNON.Vec3(210, 0, 210),
-    new CANNON.Vec3(-210, 0, 210)
-];
-const trackFaces = [
-    [0, 1, 2, 3],
-    [4, 5, 6, 7],
-    [0, 4, 5, 1],
-    [1, 5, 6, 2],
-    [2, 6, 7, 3],
-    [3, 7, 4, 0]
-];
-const trackShape = new CANNON.ConvexPolyhedron(trackVertices, trackFaces);
-const trackBody = new CANNON.Body({ mass: 0, material: groundMaterial });
-trackBody.addShape(trackShape);
-trackBody.position.set(0, 0.1, 0);
-world.addBody(trackBody);
-
-// Original Jump (Number 4)
-const jumpGeometry = new THREE.BoxGeometry(20, 5, 40);
-const jumpMesh = new THREE.Mesh(jumpGeometry, trackMaterial);
-jumpMesh.rotation.x = -Math.PI / 6;
-jumpMesh.position.set(220, 2.5, -50);
-scene.add(jumpMesh);
-
-const jumpShape = new CANNON.Box(new CANNON.Vec3(10, 2.5, 20));
-const jumpBody = new CANNON.Body({ mass: 0, material: groundMaterial });
-jumpBody.addShape(jumpShape);
-jumpBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 6);
-jumpBody.position.set(220, 2.5, -50);
-world.addBody(jumpBody);
-
-// Medium Jump (Top, Number 1)
-const mediumJumpGeometry = new THREE.BoxGeometry(18, 4, 35);
-const mediumJumpMesh = new THREE.Mesh(mediumJumpGeometry, trackMaterial);
-mediumJumpMesh.rotation.x = -Math.PI / 6;
-mediumJumpMesh.rotation.y = Math.PI;
-mediumJumpMesh.position.set(0, 2, 230);
-scene.add(mediumJumpMesh);
-
-const mediumJumpShape = new CANNON.Box(new CANNON.Vec3(9, 2, 17.5));
-const mediumJumpBody = new CANNON.Body({ mass: 0, material: groundMaterial });
-mediumJumpBody.addShape(mediumJumpShape);
-mediumJumpBody.quaternion.setFromEuler(-Math.PI / 6, Math.PI, 0, 'XYZ');
-mediumJumpBody.position.set(0, 2, 230);
-world.addBody(mediumJumpBody);
-
-// New Large Jump (Bottom, Number 3)
-const largeJumpGeometry = new THREE.BoxGeometry(20, 5, 40);
-const largeJumpMesh = new THREE.Mesh(largeJumpGeometry, trackMaterial);
-largeJumpMesh.rotation.x = -Math.PI / 6;
-largeJumpMesh.rotation.y = 0;
-largeJumpMesh.position.set(0, 2.5, -230);
-scene.add(largeJumpMesh);
-
-const largeJumpShape = new CANNON.Box(new CANNON.Vec3(10, 2.5, 20));
-const largeJumpBody = new CANNON.Body({ mass: 0, material: groundMaterial });
-largeJumpBody.addShape(largeJumpShape);
-largeJumpBody.quaternion.setFromEuler(-Math.PI / 6, 0, 0, 'XYZ');
-largeJumpBody.position.set(0, 2.5, -230);
-world.addBody(largeJumpBody);
-
-// Add numbers to jumps
-const fontLoader = new THREE.FontLoader();
-fontLoader.load(
-    'https://unpkg.com/three@0.134.0/examples/fonts/helvetiker_regular.typeface.json',
-    (font) => {
-        const textMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
-
-        const originalTextGeometry = new THREE.TextGeometry('4', { font, size: 5, height: 0.5 });
-        const originalTextMesh = new THREE.Mesh(originalTextGeometry, textMaterial);
-        originalTextMesh.position.set(215, 7, -50);
-        originalTextMesh.rotation.y = 0;
-        scene.add(originalTextMesh);
-
-        const mediumTextGeometry = new THREE.TextGeometry('1', { font, size: 5, height: 0.5 });
-        const mediumTextMesh = new THREE.Mesh(mediumTextGeometry, textMaterial);
-        mediumTextMesh.position.set(-5, 6, 230);
-        mediumTextMesh.rotation.y = Math.PI;
-        scene.add(mediumTextMesh);
-
-        const largeTextGeometry = new THREE.TextGeometry('3', { font, size: 5, height: 0.5 });
-        const largeTextMesh = new THREE.Mesh(largeTextGeometry, textMaterial);
-        largeTextMesh.position.set(-5, 7, -230);
-        largeTextMesh.rotation.y = 0;
-        scene.add(largeTextMesh);
-
-        console.log('Jump numbers added successfully');
-    },
-    (progress) => console.log('Font loading progress:', progress.loaded / progress.total * 100 + '%'),
-    (error) => console.error('Font loading failed:', error)
-);
-
-// Start/Finish Line
-const lineGeometry = new THREE.PlaneGeometry(40, 2);
-const lineMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
-const lineMesh = new THREE.Mesh(lineGeometry, lineMaterial);
-lineMesh.rotation.x = -Math.PI / 2;
-lineMesh.position.set(230, 0.21, 0);
-scene.add(lineMesh);
-
 // ATV physics
-const chassisShape = new CANNON.Box(new CANNON.Vec3(1, 0.5, 1));
-const chassisBody = new CANNON.Body({ mass: 50, material: vehicleMaterial });
-chassisBody.addShape(chassisShape);
-chassisBody.position.set(230, 0.6, 0);
+// For chassis dimensions (width, height, length)
+const chassisShape = new CANNON.Box(new CANNON.Vec3(1.5, 0.3, 2.0));  // Much wider and longer, but flatter
+const chassisBody = new CANNON.Body({ mass: 150, material: vehicleMaterial }); // Higher mass for stability
+// Lower center of mass by offsetting the shape downward
+// For center of mass height (more negative = lower center of mass)
+chassisBody.addShape(chassisShape, new CANNON.Vec3(0, -0.1, 0)); // Slight offset for center of mass
+chassisBody.position.set(0, 5, 0);
 chassisBody.velocity.set(0, 0, 0);
 chassisBody.angularVelocity.set(0, 0, 0);
 chassisBody.quaternion.set(0, 0, 0, 1);
-chassisBody.linearDamping = 0.9;
-chassisBody.angularDamping = 0.9;
+chassisBody.linearDamping = 0.7; // Less linear damping for smoother movement
+chassisBody.angularDamping = 0.8;  // Reduced to allow some tilting while still providing stability
 world.addBody(chassisBody);
 
 // Wheels physics
@@ -220,10 +250,10 @@ const wheelShape = new CANNON.Sphere(0.5);
 const wheelBodies = [];
 const wheelConstraints = [];
 const wheelPositions = [
-    new CANNON.Vec3(-1.5, -0.5, -1), // Front left
-    new CANNON.Vec3(1.5, -0.5, -1),  // Front right
-    new CANNON.Vec3(-1.5, -0.5, 1),  // Rear left
-    new CANNON.Vec3(1.5, -0.5, 1)    // Rear right
+    new CANNON.Vec3(-1.7, -0.4, -1.8), // Front left - wider and further forward
+    new CANNON.Vec3(1.7, -0.4, -1.8),  // Front right - wider and further forward
+    new CANNON.Vec3(-1.7, -0.4, 1.8),  // Rear left - wider and further back
+    new CANNON.Vec3(1.7, -0.4, 1.8)    // Rear right - wider and further back
 ];
 
 wheelPositions.forEach((pos, index) => {
@@ -251,7 +281,6 @@ world.step(1 / 60);
 
 // Load ATV model
 let atvMesh;
-const gltfLoader = new THREE.GLTFLoader();
 gltfLoader.load(
     'models/atv/scene.gltf',
     (gltf) => {
@@ -378,25 +407,49 @@ speedometer.style.padding = '5px';
 document.body.appendChild(speedometer);
 
 // Camera setup
-camera.position.set(230, 10, -30);
-camera.lookAt(230, 0, 0);
+camera.position.set(0, 10, -30);
+camera.lookAt(0, 0, 0);
 
 // Keyboard controls
 const controls = { forward: false, backward: false, left: false, right: false };
 document.addEventListener('keydown', (event) => {
     switch (event.key) {
-        case 'w': controls.forward = true; break;
-        case 's': controls.backward = true; break;
-        case 'a': controls.left = true; break;
-        case 'd': controls.right = true; break;
+        case 'w': 
+        case 'ArrowUp': 
+            controls.forward = true; 
+            break;
+        case 's': 
+        case 'ArrowDown': 
+            controls.backward = true; 
+            break;
+        case 'a': 
+        case 'ArrowLeft': 
+            controls.left = true; 
+            break;
+        case 'd': 
+        case 'ArrowRight': 
+            controls.right = true; 
+            break;
     }
 });
 document.addEventListener('keyup', (event) => {
     switch (event.key) {
-        case 'w': controls.forward = false; break;
-        case 's': controls.backward = false; break;
-        case 'a': controls.left = false; break;
-        case 'd': controls.right = false; break;
+        case 'w': 
+        case 'ArrowUp': 
+            controls.forward = false; 
+            break;
+        case 's': 
+        case 'ArrowDown': 
+            controls.backward = false; 
+            break;
+        case 'a': 
+        case 'ArrowLeft': 
+            controls.left = false; 
+            break;
+        case 'd': 
+        case 'ArrowRight': 
+            controls.right = false; 
+            break;
     }
 });
 
@@ -407,13 +460,15 @@ function animate() {
 
     world.step(1 / 60);
 
-    const speed = 1200;
-    const turnSpeed = 1.75;
+    const speed = 2000; // Reduced speed
+    // For turning sensitivity (lower = more stable turns)
+    const turnSpeed = 1.25; // Reduced from 1.5 for more stable turning
     const localDirection = new CANNON.Vec3(0, 0, -1);
     const worldDirection = chassisBody.quaternion.vmult(localDirection);
     worldDirection.y = 0;
     worldDirection.normalize();
 
+    // Simplify force application - apply directly to center of mass
     if (controls.forward) {
         chassisBody.applyForce(worldDirection.scale(-speed * 5), chassisBody.position);
     } else if (controls.backward) {
@@ -428,7 +483,7 @@ function animate() {
         chassisBody.angularVelocity.y *= 0.9;
     }
 
-    if (chassisBody.position.y <= 0.5 && !settled) {
+    if (chassisBody.position.y <= 0.9 && !settled) {
         settled = true;
         chassisBody.linearDamping = 0.5;
         chassisBody.angularDamping = 0.5;
@@ -484,8 +539,9 @@ function animate() {
         }
     }
 
-    if (chassisBody.position.y < -10 || chassisBody.position.y > 50) {
-        chassisBody.position.set(230, 0.6, 0);
+    if (chassisBody.position.y < -25 || chassisBody.position.y > 50) {
+        // If the ATV falls through or flies off, reset it
+        chassisBody.position.set(0, 10, 0);
         chassisBody.velocity.set(0, 0, 0);
         chassisBody.angularVelocity.set(0, 0, 0);
         chassisBody.quaternion.set(0, 0, 0, 1);
