@@ -1,11 +1,33 @@
 const express = require('express');
 const http = require('http');
+const https = require('https');
+const fs = require('fs');
 const { Server } = require('socket.io');
 const path = require('path');
 
-// Create express app and HTTP server
+// Create express app
 const app = express();
-const server = http.createServer(app);
+
+// Check if SSL certificates are provided through environment variables
+const SSL_KEY_PATH = process.env.SSL_KEY_PATH;
+const SSL_CERT_PATH = process.env.SSL_CERT_PATH;
+
+let server;
+
+// Create either HTTP or HTTPS server based on certificate availability
+if (SSL_KEY_PATH && SSL_CERT_PATH && fs.existsSync(SSL_KEY_PATH) && fs.existsSync(SSL_CERT_PATH)) {
+  const sslOptions = {
+    key: fs.readFileSync(SSL_KEY_PATH),
+    cert: fs.readFileSync(SSL_CERT_PATH)
+  };
+  server = https.createServer(sslOptions, app);
+  console.log('Using HTTPS server with SSL certificates');
+} else {
+  server = http.createServer(app);
+  console.log('Using HTTP server - SSL certificates not found');
+}
+
+// Create Socket.IO server
 const io = new Server(server);
 
 // Serve static files
@@ -165,9 +187,10 @@ io.on('connection', (socket) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8090;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  const protocol = SSL_KEY_PATH && SSL_CERT_PATH ? 'https' : 'http';
+  console.log(`Server running on ${protocol}://localhost:${PORT}`);
 });
 
 // Helper function to generate random color for players

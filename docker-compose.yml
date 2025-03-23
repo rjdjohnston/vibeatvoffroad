@@ -4,10 +4,17 @@ services:
     build: .
     ports:
       - "8090:8090"
+      - "8443:8443"  # Add HTTPS port mapping
     volumes:
       - ./:/app
       - /app/node_modules
+      # Mount SSL certificates (commented out until certificates are available)
+      - ./certs/server.key:/app/certs/server.key
+      - ./certs/server.crt:/app/certs/server.crt
     environment:
       - NODE_ENV=production
       - PORT=8090
+      # SSL certificate environment variables (commented out until certificates are available)
+      - SSL_KEY_PATH=/app/certs/server.key
+      - SSL_CERT_PATH=/app/certs/server.crt
     restart: unless-stopped
