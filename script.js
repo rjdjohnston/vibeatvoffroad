@@ -9,6 +9,11 @@ document.body.appendChild(renderer.domElement);
 // Multiplayer manager
 let multiplayerManager = null;
 
+// Flip detection variables
+let isFlipped = false;
+let flipStartTime = 0;
+let flipTimeout = 3000; // 3 seconds in milliseconds
+
 // Physics world
 const world = new CANNON.World();
 world.gravity.set(0, -15.82, 0);
@@ -722,6 +727,46 @@ function animate() {
         chassisBody.angularDamping = 0.9;
         console.log('ATV reset to starting position');
     }
+    
+    // Check if ATV is flipped upside down
+    if (chassisBody) {
+        // Get the up vector in world space
+        const localUpVector = new CANNON.Vec3(0, 1, 0);
+        const worldUpVector = chassisBody.quaternion.vmult(localUpVector);
+        
+        // Calculate the dot product with the world up vector (0, 1, 0)
+        // If this is negative, the ATV is more upside down than right side up
+        const dotProduct = worldUpVector.dot(new CANNON.Vec3(0, 1, 0));
+        
+        if (dotProduct < -0.5) { // -0.5 threshold indicates significantly upside down
+            if (!isFlipped) {
+                // ATV just flipped
+                isFlipped = true;
+                flipStartTime = Date.now();
+                console.log('ATV flipped upside down');
+            } else if (Date.now() - flipStartTime > flipTimeout) {
+                // ATV has been flipped for over 3 seconds - respawn at same position
+                const currentPosition = chassisBody.position.clone();
+                
+                // Keep the X and Z position, but reset Y to be slightly above the ground
+                // Also reset orientation and velocities
+                chassisBody.position.set(currentPosition.x, 5, currentPosition.z);
+                chassisBody.velocity.set(0, 0, 0);
+                chassisBody.angularVelocity.set(0, 0, 0);
+                chassisBody.quaternion.set(0, 0, 0, 1);
+                
+                // Reset flip detection
+                isFlipped = false;
+                console.log('ATV auto-respawned due to being upside down');
+                
+                // Add a visible message about the respawn
+                showRespawnMessage();
+            }
+        } else {
+            // ATV is not flipped
+            isFlipped = false;
+        }
+    }
 
     renderer.render(scene, camera);
     
@@ -732,6 +777,31 @@ function animate() {
     }
 }
 animate();
+
+// Show a temporary message about the auto-respawn
+function showRespawnMessage() {
+    const message = document.createElement('div');
+    message.style.position = 'absolute';
+    message.style.top = '50%';
+    message.style.left = '50%';
+    message.style.transform = 'translate(-50%, -50%)';
+    message.style.background = 'rgba(0, 0, 0, 0.7)';
+    message.style.color = 'white';
+    message.style.padding = '20px';
+    message.style.borderRadius = '10px';
+    message.style.fontSize = '24px';
+    message.style.fontWeight = 'bold';
+    message.style.zIndex = '1000';
+    message.style.textAlign = 'center';
+    message.innerHTML = 'Vehicle respawned<br><span style="font-size: 16px">Your ATV was upside down for too long</span>';
+    
+    document.body.appendChild(message);
+    
+    // Remove the message after 2 seconds
+    setTimeout(() => {
+        document.body.removeChild(message);
+    }, 2000);
+}
 
 // Resize handler
 window.addEventListener('resize', () => {
