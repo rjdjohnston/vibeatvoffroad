@@ -4,11 +4,277 @@
     <meta charset="UTF-8">
     <title>Vibe ATV by RJ</title>
     <style>
-        body { margin: 0; overflow: hidden; }
-        canvas { display: block; }
+        body { 
+            margin: 0; 
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+        }
+        canvas { 
+            display: block; 
+        }
+        #start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        #start-form {
+            background: rgba(40, 40, 40, 0.9);
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(0, 100, 255, 0.8);
+            max-width: 500px;
+            width: 90%;
+            border: 1px solid #00a2ff;
+        }
+        #start-form h1 {
+            color: #0095ff;
+            margin-top: 0;
+            font-size: 36px;
+            text-shadow: 0 0 10px rgba(0, 150, 255, 0.8);
+        }
+        #start-form p {
+            color: #ffffff;
+            margin-bottom: 25px;
+            font-size: 18px;
+        }
+        #username {
+            width: 80%;
+            padding: 12px;
+            margin-bottom: 25px;
+            border-radius: 5px;
+            border: 2px solid #0077ff;
+            background: #151515;
+            color: white;
+            font-size: 18px;
+            text-align: center;
+        }
+        #start-button {
+            background: linear-gradient(to right, #0066ff, #00c2ff);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            font-size: 20px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        #start-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(0, 150, 255, 0.7);
+        }
+        .hidden {
+            display: none !important;
+        }
+        
+        /* Scoreboard styling */
+        #scoreboard {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 10px;
+            padding: 15px;
+            min-width: 200px;
+            color: white;
+            z-index: 100;
+            font-size: 16px;
+            border: 1px solid rgba(0, 160, 255, 0.5);
+        }
+        #scoreboard h3 {
+            margin: 0 0 10px 0;
+            color: #00a2ff;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+            padding-bottom: 5px;
+            text-align: center;
+        }
+        .player-entry {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+            padding: 5px;
+            border-radius: 5px;
+        }
+        .player-color {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        .player-name {
+            flex-grow: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .player-indicator {
+            margin-left: 5px;
+            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            background: #0066ff;
+        }
+        
+        /* Notifications styling */
+        #notifications {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 500px;
+            z-index: 100;
+        }
+        .notification {
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            text-align: center;
+            animation: fadeOut 3s forwards;
+            border-left: 4px solid #00a2ff;
+        }
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        
+        /* Controls info styling */
+        #controls-info {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 100;
+            font-size: 14px;
+            border: 1px solid rgba(0, 160, 255, 0.5);
+            transition: opacity 0.3s ease;
+        }
+        #controls-info h3 {
+            margin: 0 0 10px 0;
+            color: #00a2ff;
+            font-size: 16px;
+            text-align: center;
+        }
+        .control-row {
+            display: flex;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+        .key {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-radius: 4px;
+            padding: 2px 8px;
+            margin-right: 8px;
+            font-family: monospace;
+            font-weight: bold;
+            min-width: 20px;
+            text-align: center;
+        }
+        
+        /* Game HUD */
+        #game-hud {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            z-index: 100;
+            font-size: 16px;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid rgba(0, 160, 255, 0.5);
+        }
+        .hud-stat {
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+        }
+        .hud-label {
+            font-weight: bold;
+            margin-right: 10px;
+            color: #00a2ff;
+        }
+        .hud-value {
+            font-family: monospace;
+        }
     </style>
 </head>
 <body>
+    <!-- Game Start Screen -->
+    <div id="start-screen">
+        <div id="start-form">
+            <h1>VIBE ATV OFF-ROAD</h1>
+            <p>Enter your name to join the multiplayer race!</p>
+            <input type="text" id="username" placeholder="Your Name" maxlength="15" autocomplete="off">
+            <button id="start-button">START GAME</button>
+        </div>
+    </div>
+    
+    <!-- Scoreboard -->
+    <div id="scoreboard" class="hidden">
+        <h3>PLAYERS</h3>
+        <div id="player-list">
+            <!-- Player entries will be added dynamically -->
+        </div>
+    </div>
+    
+    <!-- Controls Info -->
+    <div id="controls-info" class="hidden">
+        <h3>CONTROLS</h3>
+        <div class="control-row">
+            <div class="key">W</div>
+            <div>Accelerate</div>
+        </div>
+        <div class="control-row">
+            <div class="key">S</div>
+            <div>Brake/Reverse</div>
+        </div>
+        <div class="control-row">
+            <div class="key">A</div>
+            <div>Turn Left</div>
+        </div>
+        <div class="control-row">
+            <div class="key">D</div>
+            <div>Turn Right</div>
+        </div>
+        <!-- <div class="control-row">
+            <div class="key">R</div>
+            <div>Manual Respawn</div>
+        </div> -->
+    </div>
+    
+    <!-- Game HUD -->
+    <div id="game-hud" class="hidden">
+        <div class="hud-stat">
+            <div class="hud-label">SPEED</div>
+            <div class="hud-value" id="speed-value">0 km/h</div>
+        </div>
+        <div class="hud-stat">
+            <div class="hud-label">HEIGHT</div>
+            <div class="hud-value" id="height-value">0 m</div>
+        </div>
+    </div>
+    
+    <!-- Notifications -->
+    <div id="notifications">
+        <!-- Notification messages will be added dynamically -->
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
     <script src="https://unpkg.com/three@0.134.0/examples/js/loaders/GLTFLoader.js"></script>

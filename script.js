@@ -1,3 +1,62 @@
+// Wait for DOM content to be fully loaded before setting up game start handlers
+document.addEventListener('DOMContentLoaded', function() {
+    setupGameStart();
+});
+
+// Setup game start event handlers
+function setupGameStart() {
+    const startScreen = document.getElementById('start-screen');
+    const startButton = document.getElementById('start-button');
+    const usernameInput = document.getElementById('username');
+    const controlsInfo = document.getElementById('controls-info');
+    const gameHud = document.getElementById('game-hud');
+    
+    // Focus the username input
+    setTimeout(() => {
+        usernameInput.focus();
+    }, 500);
+    
+    // Allow pressing Enter to start the game
+    usernameInput.addEventListener('keyup', function(event) {
+        if (event.key === 'Enter') {
+            startGame();
+        }
+    });
+    
+    // Start button click handler
+    startButton.addEventListener('click', startGame);
+    
+    function startGame() {
+        playerName = usernameInput.value.trim();
+        
+        // Use a default name if none provided
+        if (!playerName) {
+            playerName = 'Player_' + Math.floor(Math.random() * 1000);
+        }
+        
+        // Hide the start screen
+        startScreen.classList.add('hidden');
+        
+        // Show controls and HUD
+        controlsInfo.classList.remove('hidden');
+        gameHud.classList.remove('hidden');
+        
+        // Set game as started
+        gameStarted = true;
+        
+        console.log(`Game started with player name: ${playerName}`);
+        
+        // Initialize multiplayer if ATV model is already loaded
+        if (atvMesh) {
+            initializeMultiplayer();
+        }
+    }
+}
+
+// Game state variables
+let gameStarted = false;
+let playerName = '';
+
 // Scene setup
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000000);
@@ -430,23 +489,35 @@ gltfLoader.load(
     'models/atv/scene.gltf',
     (gltf) => {
         atvMesh = gltf.scene;
+        
+        // Scale and position the model to match the physics body
         atvMesh.scale.set(0.1, 0.1, 0.1);
         scene.add(atvMesh);
+        
+        // Position will be updated in the animation loop
         atvMesh.position.copy(chassisBody.position);
         atvMesh.position.y += 1.7;
         atvMesh.quaternion.copy(chassisBody.quaternion);
+        
         console.log('ATV loaded successfully');
         
         // Initialize multiplayer after ATV is loaded
-        multiplayerManager = new MultiplayerManager(scene, chassisBody, atvMesh);
-        multiplayerManager.init();
-        
-        // Create player list element
-        createPlayerListUI();
+        if (gameStarted) {
+            initializeMultiplayer();
+        }
     },
     (progress) => console.log('Loading ATV:', progress.loaded / progress.total * 100 + '%'),
     (error) => console.error('ATV loading failed:', error)
 );
+
+// Initialize multiplayer
+function initializeMultiplayer() {
+    if (!multiplayerManager && atvMesh && gameStarted) {
+        console.log("Initializing multiplayer with player name:", playerName);
+        multiplayerManager = new MultiplayerManager(scene, chassisBody, atvMesh, playerName);
+        multiplayerManager.init();
+    }
+}
 
 // Load and place survival assets
 gltfLoader.load(
@@ -607,6 +678,7 @@ document.addEventListener('keyup', (event) => {
 
 // Animation loop
 let settled = false;
+let clock = new THREE.Clock();
 function animate() {
     requestAnimationFrame(animate);
 
@@ -701,7 +773,7 @@ function animate() {
         dustParticles.geometry.attributes.position.needsUpdate = true;
 
         const speedDisplay = (velocityMagnitude * 3.6).toFixed(1);
-        speedometer.textContent = `Speed: ${speedDisplay} km/h`;
+        // speedometer.textContent = `Speed: ${speedDisplay} km/h`;
 
         const cameraOffset = new THREE.Vector3(0, 5, -10);
         const atvPosition = new THREE.Vector3().copy(atvMesh.position);
@@ -714,6 +786,8 @@ function animate() {
         if (skybox) {
             skybox.position.copy(camera.position);
         }
+        
+        updateHUD();
     }
 
     if (chassisBody.position.y < -25 || chassisBody.position.y > 50) {
@@ -777,6 +851,38 @@ function animate() {
     }
 }
 animate();
+
+// Update the HUD with current player stats
+function updateHUD() {
+    if (!gameStarted) return;
+    
+    const speedElement = document.getElementById('speed-value');
+    const heightElement = document.getElementById('height-value');
+    
+    if (speedElement && heightElement) {
+        // Calculate speed in km/h (from m/s)
+        const velocity = new THREE.Vector3();
+        velocityFromChassis(velocity);
+        const speed = Math.round(velocity.length() * 3.6); // Convert m/s to km/h
+        
+        // Get height off ground
+        const height = Math.max(0, Math.round(chassisBody.position.y - 3));
+        
+        // Update HUD elements
+        speedElement.textContent = `${speed} km/h`;
+        heightElement.textContent = `${height} m`;
+    }
+}
+
+// Helper to get velocity
+function velocityFromChassis(targetVector) {
+    targetVector.set(
+        chassisBody.velocity.x,
+        chassisBody.velocity.y,
+        chassisBody.velocity.z
+    );
+    return targetVector;
+}
 
 // Show a temporary message about the auto-respawn
 function showRespawnMessage() {
