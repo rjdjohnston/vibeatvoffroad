@@ -12,6 +12,24 @@ const app = express();
 const SSL_KEY_PATH = process.env.SSL_KEY_PATH;
 const SSL_CERT_PATH = process.env.SSL_CERT_PATH;
 
+// Add Cloudflare real IP handling
+app.set('trust proxy', true);
+
+// Add security headers
+app.use((req, res, next) => {
+  // Enable CORS for all origins during development
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+  // Security headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  
+  next();
+});
+
 let server;
 
 // Create either HTTP or HTTPS server based on certificate availability
@@ -24,11 +42,28 @@ if (SSL_KEY_PATH && SSL_CERT_PATH && fs.existsSync(SSL_KEY_PATH) && fs.existsSyn
   console.log('Using HTTPS server with SSL certificates');
 } else {
   server = http.createServer(app);
-  console.log('Using HTTP server - SSL certificates not found');
+  console.log('Using HTTP server - SSL certificates not found or not using direct SSL (Cloudflare handles SSL)');
 }
 
-// Create Socket.IO server
-const io = new Server(server);
+// Create Socket.IO server with configuration for Cloudflare
+const io = new Server(server, {
+  // Configuration for working with Cloudflare
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST'],
+    credentials: true
+  },
+  // Use WebSockets as the transport
+  transports: ['websocket'],
+  // Ping interval and timeout settings for reliable connections
+  pingInterval: 25000,
+  pingTimeout: 60000,
+  // Allow upgrade to WebSocket
+  allowUpgrades: true,
+  // For connections behind Cloudflare
+  maxHttpBufferSize: 1e8,
+  path: '/socket.io'
+});
 
 // Serve static files
 app.use(express.static(path.join(__dirname)));

@@ -41,8 +41,20 @@ class MultiplayerManager {
         
         console.log(`Initializing multiplayer for player: "${this.playerName}"`);
         
-        // Connect to server
-        this.socket = io();
+        // Connect to server with options that support Cloudflare proxying
+        const socketOptions = {
+            // Support secure websockets through Cloudflare
+            transports: ['websocket'],
+            // Needed for Cloudflare's proxy setup
+            upgrade: true,
+            // Ensure reconnection works through Cloudflare
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000,
+            timeout: 20000
+        };
+        
+        this.socket = io(window.location.origin, socketOptions);
         
         // Setup event handlers
         this.setupEventHandlers();

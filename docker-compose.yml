@@ -4,17 +4,22 @@ services:
     build: .
     ports:
       - "8090:8090"
-      - "8443:8443"  # Add HTTPS port mapping
+      # When using Cloudflare, you typically don't need this direct HTTPS port
+      # as Cloudflare handles the SSL termination
+      # - "8443:8443"
     volumes:
       - ./:/app
       - /app/node_modules
-      # Mount SSL certificates (commented out until certificates are available)
-      # - ./certs/server.key:/app/certs/server.key
-      # - ./certs/server.crt:/app/certs/server.crt
+      # With Cloudflare's SSL, you can use HTTP between Cloudflare and your origin
+      # so these certificates are optional when using Cloudflare's Full (not strict) mode
+      - ./certs/server.key:/app/certs/server.key
+      - ./certs/server.crt:/app/certs/server.crt
     environment:
       - NODE_ENV=production
       - PORT=8090
-      # SSL certificate environment variables (commented out until certificates are available)
-      # - SSL_KEY_PATH=/app/certs/server.key
-      # - SSL_CERT_PATH=/app/certs/server.crt
+      # These environment variables are still useful if you want to use Cloudflare's Full Strict mode
+      - SSL_KEY_PATH=/app/certs/server.key
+      - SSL_CERT_PATH=/app/certs/server.crt
+      # Add Cloudflare-specific environment variable
+      - USING_CLOUDFLARE=true
     restart: unless-stopped
