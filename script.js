@@ -264,6 +264,93 @@ function createTrackPhysics(trackModel) {
     westWallDebug.position.copy(westWallBody.position);
     scene.add(westWallDebug);
     
+    // Add ramps to the track with a much simpler implementation
+    function createRamp(x, z, width, height, depth, angle, axis, color) {
+        // Create the physics body - position is key for a smooth transition
+        const rampBody = new CANNON.Body({ mass: 0, material: groundMaterial });
+        const rampShape = new CANNON.Box(new CANNON.Vec3(width/2, height/2, depth/2));
+        
+        // Calculate the vertical offset to make the edge flush with the ground
+        // For x-axis rotation (north/south ramps)
+        let yPos = 0;
+        if (axis === 'x') {
+            // If angle is negative (upward at front), we need to lower the back
+            // If angle is positive (upward at back), we need to lower the front
+            const edgeOffset = angle < 0 ? 
+                Math.sin(Math.abs(angle)) * depth/1 : // For negative angle (north ramp)
+                -Math.sin(Math.abs(angle)) * depth/1;  // For positive angle (south ramp)
+            yPos = height/2 + edgeOffset;
+        }
+        // For z-axis rotation (east/west ramps)
+        else if (axis === 'z') {
+            // If angle is negative (upward at right), we need to lower the left
+            // If angle is positive (upward at left), we need to lower the right
+            const edgeOffset = angle < 0 ? 
+                Math.sin(Math.abs(angle)) * depth/1 : // For negative angle (east ramp)
+                -Math.sin(Math.abs(angle)) * depth/1;  // For positive angle (west ramp)
+            yPos = height/2 + edgeOffset;
+        }
+        
+        rampBody.addShape(rampShape);
+        rampBody.position.set(x, yPos, z);
+        
+        // Apply rotation based on axis
+        const rotationAxis = new CANNON.Vec3();
+        if (axis === 'x') {
+            rotationAxis.set(1, 0, 0);
+        } else if (axis === 'z') {
+            rotationAxis.set(0, 0, 1);
+        }
+        rampBody.quaternion.setFromAxisAngle(rotationAxis, angle);
+        world.addBody(rampBody);
+        
+        // Create the visual representation
+        const rampGeometry = new THREE.BoxGeometry(width, height, depth);
+        const rampMaterial = new THREE.MeshStandardMaterial({
+            color: color,
+            roughness: 0.7,
+            metalness: 0.2,
+            emissive: color,
+            emissiveIntensity: 0.3
+        });
+        const rampMesh = new THREE.Mesh(rampGeometry, rampMaterial);
+        
+        // Position the mesh to match the physics body
+        rampMesh.position.copy(rampBody.position);
+        if (axis === 'x') {
+            rampMesh.rotation.x = angle;
+        } else if (axis === 'z') {
+            rampMesh.rotation.z = angle;
+        }
+        
+        scene.add(rampMesh);
+        
+        // Add spotlight for better visibility
+        const spotLight = new THREE.SpotLight(color, 1.5);
+        spotLight.position.set(x, 30, z);
+        spotLight.target = rampMesh;
+        spotLight.angle = Math.PI / 6;
+        spotLight.penumbra = 0.2;
+        spotLight.distance = 100;
+        scene.add(spotLight);
+        
+        console.log(`Created ramp at (${x}, ${yPos}, ${z}) with rotation ${angle} on ${axis} axis`);
+    }
+    
+    // Create the four ramps - make the angles more gradual and heights lower
+    // createRamp(x, z, width, height, depth, angle, axis, color)
+    // North ramp (red) - more gradual approach
+    // createRamp(0, 50, 40, 15, 50, -Math.PI/12, 'x', 0xFF0000);
+    
+    // East ramp (green) - more gradual approach
+    // createRamp(50, 0, 30, 15, 50, -Math.PI/12, 'z', 0x00FF00);
+    
+    // South ramp (blue) - more gradual approach
+    createRamp(0, -50, 40, 15, 50, Math.PI/12, 'x', 0x0000FF);
+    
+    // West ramp (yellow) - more gradual approach
+    // createRamp(-50, 0, 30, 15, 50, Math.PI/12, 'z', 0xFFFF00);
+    
     console.log("Track physics created");
 }
 
