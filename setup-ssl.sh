@@ -52,7 +52,7 @@ function check_openssl {
   fi
 }
 
-# Check if docker and docker-compose are installed
+# Check if docker and docker compose are installed
 function check_docker {
   if ! command -v docker &> /dev/null; then
     echo "Error: docker is not installed!"
@@ -60,9 +60,10 @@ function check_docker {
     exit 1
   fi
 
-  if ! command -v docker-compose &> /dev/null; then
-    echo "Error: docker-compose is not installed!"
-    echo "Please install docker-compose before continuing."
+  # Check if docker compose subcommand works (new syntax)
+  if ! docker compose version &> /dev/null; then
+    echo "Error: docker compose is not available!"
+    echo "Please ensure you have Docker with Compose V2 installed."
     exit 1
   fi
 }
@@ -208,7 +209,7 @@ if [ -f "$CERT_PATH/$DOMAIN/fullchain.pem" ] && [ -f "$CERT_PATH/$DOMAIN/privkey
   cp "$CERT_PATH/$DOMAIN/privkey.pem" certs/server.key
   
   # Restart Docker containers to apply new certificates
-  docker-compose restart
+  docker compose restart
 fi
 EOF
     
@@ -298,4 +299,4 @@ fi
 echo ""
 echo "SSL setup complete!"
 echo "To use HTTPS with your Vibe ATV Off-road game, restart your Docker containers:"
-echo "docker-compose down && docker-compose up -d"
+echo "docker compose down && docker compose up -d"

@@ -37,7 +37,7 @@ The game can be deployed using Docker for easier setup and deployment.
 
 1. Build and start the containers:
    ```
-   docker-compose up -d
+   docker compose up -d
    ```
 2. Open your browser and visit: http://localhost:8090
 
@@ -84,7 +84,7 @@ The `setup-ssl.sh` script automates the SSL certificate setup process while ensu
 After setting up SSL, restart your Docker containers to apply the changes:
 
 ```bash
-docker-compose down && docker-compose up -d
+docker compose down && docker compose up -d
 ```
 
 ## Game Controls
