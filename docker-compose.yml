@@ -22,3 +22,10 @@ services:
       # Add Cloudflare-specific environment variable
       - USING_CLOUDFLARE=true
     restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    external:
+      name: dggames_app-network
