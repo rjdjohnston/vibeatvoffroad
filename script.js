@@ -186,7 +186,7 @@ gltfLoader.load(
         
         // Adjust ATV starting position to match the new track
         if (chassisBody) {
-            chassisBody.position.set(0, 10, 0); // Increased height for safety
+            chassisBody.position.set(20, 10, 20); // Increased height for safety
             chassisBody.velocity.set(0, 0, 0);
             chassisBody.angularVelocity.set(0, 0, 0);
             chassisBody.quaternion.set(0, 0, 0, 1);
@@ -513,7 +513,7 @@ const chassisBody = new CANNON.Body({ mass: 150, material: vehicleMaterial }); /
 // Lower center of mass by offsetting the shape downward
 // For center of mass height (more negative = lower center of mass)
 chassisBody.addShape(chassisShape, new CANNON.Vec3(0, -0.1, 0)); // Slight offset for center of mass
-chassisBody.position.set(0, 5, 0);
+chassisBody.position.set(20, 5, 20);
 chassisBody.velocity.set(0, 0, 0);
 chassisBody.angularVelocity.set(0, 0, 0);
 chassisBody.quaternion.set(0, 0, 0, 1);
@@ -864,7 +864,7 @@ function animate() {
 
     if (chassisBody.position.y < -25 || chassisBody.position.y > 50) {
         // If the ATV falls through or flies off, reset it
-        chassisBody.position.set(0, 10, 0);
+        chassisBody.position.set(20, 10, 20);
         chassisBody.velocity.set(0, 0, 0);
         chassisBody.angularVelocity.set(0, 0, 0);
         chassisBody.quaternion.set(0, 0, 0, 1);
@@ -1241,7 +1241,7 @@ function createStartPortal() {
         // console.log("Creating start portal");
         // Create portal group to contain all portal elements
         const startPortalGroup = new THREE.Group();
-        startPortalGroup.position.set(0, 5, 0);
+        startPortalGroup.position.set(20, 5, 20); // Adjusted to match new ATV starting position
         startPortalGroup.rotation.x = 0.35;
         startPortalGroup.rotation.y = 0;
 
