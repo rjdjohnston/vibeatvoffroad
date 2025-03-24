@@ -141,7 +141,6 @@ let trackCollider;
 
 // Background (Desert Image JPG)
 let skybox;
-// console.log('Starting skybox load...');
 textureLoader.load(
     'assets/desert_image.jpg',
     (texture) => {
@@ -157,12 +156,11 @@ textureLoader.load(
         // console.log('Desert skybox loaded at:', skybox.position, 'Scale:', skybox.scale);
         // console.log('Scene children after adding skybox:', scene.children.length);
     },
-    (progress) => console.log('Loading skybox progress:', progress.loaded / progress.total * 100 + '%'),
+    () => {}, // Removed console.log from progress callback
     (error) => console.error('Skybox loading failed:', error)
 );
 
 // Load 3D Race Track Model
-// console.log('Loading 3D race track model...');
 gltfLoader.load(
     'models/tracks/drift_race_track.glb',
     (gltf) => {
@@ -194,7 +192,7 @@ gltfLoader.load(
             chassisBody.quaternion.set(0, 0, 0, 1);
         }
     },
-    (progress) => console.log('Loading 3D track progress:', progress.loaded / progress.total * 100 + '%'),
+    () => {}, // Removed console.log from progress callback
     (error) => console.error('3D track loading failed:', error)
 );
 
@@ -309,13 +307,6 @@ function createTrackPhysics(trackModel) {
     westWallBody.addShape(westWallShape);
     westWallBody.position.set(negWallX, centerY + wallHeight, centerZ);
     world.addBody(westWallBody);
-    
-    // console.log("Added wall colliders at edges:", 
-    //     "North:", wallZ, 
-    //     "South:", negWallZ, 
-    //     "East:", wallX, 
-    //     "West:", negWallX
-    // );
     
     // Create a debug visual to see the physics shape
     const debugGeometry = new THREE.BoxGeometry(trackWidth * 2, trackHeight * 2, trackLength * 2);
