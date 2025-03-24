@@ -1,6 +1,8 @@
 // Wait for DOM content to be fully loaded before setting up game start handlers
 document.addEventListener('DOMContentLoaded', function() {
     setupGameStart();
+    createExitPortal();
+    createStartPortal();
 });
 
 // Setup game start event handlers
@@ -11,16 +13,33 @@ function setupGameStart() {
     const controlsInfo = document.getElementById('controls-info');
     const gameHud = document.getElementById('game-hud');
     
-    // Check if we have a saved username in localStorage
-    const savedUsername = localStorage.getItem('vibeatv_username');
-    if (savedUsername) {
-        usernameInput.value = savedUsername;
-    }
+    // Check for URL parameters (from portal redirect)
+    const urlParams = new URLSearchParams(window.location.search);
+    const isFromPortal = urlParams.get('portal') === 'true';
+    const urlUsername = urlParams.get('username');
     
-    // Focus the username input
-    setTimeout(() => {
-        usernameInput.focus();
-    }, 500);
+    if (isFromPortal && urlUsername) {
+        console.log(`Player arrived via portal with username: ${urlUsername}`);
+        // Set the username input value
+        usernameInput.value = urlUsername;
+        // Save to localStorage for future sessions
+        localStorage.setItem('vibeatv_username', urlUsername);
+        // Auto-start the game after a short delay to ensure everything is loaded
+        setTimeout(() => {
+            startGame();
+        }, 500);
+    } else {
+        // Normal flow - check localStorage for previously saved username
+        const savedUsername = localStorage.getItem('vibeatv_username');
+        if (savedUsername) {
+            usernameInput.value = savedUsername;
+        }
+        
+        // Focus the username input
+        setTimeout(() => {
+            usernameInput.focus();
+        }, 500);
+    }
     
     // Allow pressing Enter to start the game
     usernameInput.addEventListener('keyup', function(event) {
@@ -65,6 +84,8 @@ function setupGameStart() {
 // Game state variables
 let gameStarted = false;
 let playerName = '';
+let startPortalBox; // Global variable for start portal collision detection
+let exitPortalBox; // Global variable for exit portal collision detection
 
 // Scene setup
 const scene = new THREE.Scene();
@@ -935,11 +956,12 @@ function updateHUD() {
 }
 
 function vibeVerse() {
+    console.log("vibeVerse function called");
     if (new URLSearchParams(window.location.search).get('portal')) {
         // <check if player has entered start portal>
             setTimeout(function() {
-                if (typeof player !== 'undefined' && player) {
-                    const playerBox = new THREE.Box3().setFromObject(player);
+                if (typeof atvMesh !== 'undefined' && atvMesh) {
+                    const playerBox = new THREE.Box3().setFromObject(atvMesh);
                     const portalDistance = playerBox.getCenter(new THREE.Vector3()).distanceTo(startPortalBox.getCenter(new THREE.Vector3()));
                     if (portalDistance < 50) {
                         // Get ref from URL params
@@ -969,16 +991,32 @@ function vibeVerse() {
     }
 
     // <check if player has entered exit portal>
-        if (typeof player !== 'undefined' && player) {
-            const playerBox = new THREE.Box3().setFromObject(player);
+        if (typeof atvMesh !== 'undefined' && atvMesh) {
+            console.log("ATV mesh check passed");
+            const playerBox = new THREE.Box3().setFromObject(atvMesh);
             // Check if player is within 50 units of the portal
-            const portalDistance = playerBox.getCenter(new THREE.Vector3()).distanceTo(exitPortalBox.getCenter(new THREE.Vector3()));
+            if (typeof exitPortalBox === 'undefined') {
+                console.error("exitPortalBox is undefined in vibeVerse!");
+                return;
+            }
+            const portalCenter = exitPortalBox.getCenter(new THREE.Vector3());
+            const playerCenter = playerBox.getCenter(new THREE.Vector3());
+            console.log("Player position:", playerCenter);
+            console.log("Portal position:", portalCenter);
+            const portalDistance = playerCenter.distanceTo(portalCenter);
+            console.log("Distance to portal:", portalDistance);
+            
             if (portalDistance < 50) {
+                console.log("Player is within 50 units of portal");
+                // Calculate current speed from vehicle velocity
+                const currentSpeed = Math.round(chassisBody.velocity.length());
+                console.log("Current speed:", currentSpeed);
+                
                 // Start loading the next page in the background
                 const currentParams = new URLSearchParams(window.location.search);
                 const newParams = new URLSearchParams();
                 newParams.append('portal',true);
-                newParams.append('username',selfUsername);
+                newParams.append('username', playerName);
                 newParams.append('color','white');
                 newParams.append('speed',currentSpeed);
 
@@ -995,10 +1033,12 @@ function vibeVerse() {
                     iframe.style.display = 'none';
                     iframe.src = nextPage;
                     document.body.appendChild(iframe);
+                    console.log("Preloading next page:", nextPage);
                 }
 
                 // Only redirect once actually in the portal
                 if (playerBox.intersectsBox(exitPortalBox)) {
+                    console.log("Portal intersection detected! Redirecting to:", nextPage);
                     window.location.href = nextPage;
                 }
             }
@@ -1094,97 +1134,12 @@ function updatePlayerListUI() {
     });
 }
 
-if (new URLSearchParams(window.location.search).get('portal')) {
-    // <create start portal>
-        // Create portal group to contain all portal elements
-        const startPortalGroup = new THREE.Group();
-        startPortalGroup.position.set(SPAWN_POINT_X, SPAWN_POINT_Y, SPAWN_POINT_Z);
-        startPortalGroup.rotation.x = 0.35;
-        startPortalGroup.rotation.y = 0;
-
-        // Create portal effect
-        const startPortalGeometry = new THREE.TorusGeometry(15, 2, 16, 100);
-        const startPortalMaterial = new THREE.MeshPhongMaterial({
-            color: 0xff0000,
-            emissive: 0xff0000,
-            transparent: true,
-            opacity: 0.8
-        });
-        const startPortal = new THREE.Mesh(startPortalGeometry, startPortalMaterial);
-        startPortalGroup.add(startPortal);
-                        
-        // Create portal inner surface
-        const startPortalInnerGeometry = new THREE.CircleGeometry(13, 32);
-        const startPortalInnerMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
-            transparent: true,
-            opacity: 0.5,
-            side: THREE.DoubleSide
-        });
-        const startPortalInner = new THREE.Mesh(startPortalInnerGeometry, startPortalInnerMaterial);
-        startPortalGroup.add(startPortalInner);
-
-        // Create particle system for portal effect
-        const startPortalParticleCount = 1000;
-        const startPortalParticles = new THREE.BufferGeometry();
-        const startPortalPositions = new Float32Array(startPortalParticleCount * 3);
-        const startPortalColors = new Float32Array(startPortalParticleCount * 3);
-
-        for (let i = 0; i < startPortalParticleCount * 3; i += 3) {
-            // Create particles in a ring around the portal
-            const angle = Math.random() * Math.PI * 2;
-            const radius = 15 + (Math.random() - 0.5) * 4;
-            startPortalPositions[i] = Math.cos(angle) * radius;
-            startPortalPositions[i + 1] = Math.sin(angle) * radius;
-            startPortalPositions[i + 2] = (Math.random() - 0.5) * 4;
-
-            // Red color with slight variation
-            startPortalColors[i] = 0.8 + Math.random() * 0.2;
-            startPortalColors[i + 1] = 0;
-            startPortalColors[i + 2] = 0;
-        }
-
-        startPortalParticles.setAttribute('position', new THREE.BufferAttribute(startPortalPositions, 3));
-        startPortalParticles.setAttribute('color', new THREE.BufferAttribute(startPortalColors, 3));
-
-        const startPortalParticleMaterial = new THREE.PointsMaterial({
-            size: 0.2,
-            vertexColors: true,
-            transparent: true,
-            opacity: 0.6
-        });
-
-        const startPortalParticleSystem = new THREE.Points(startPortalParticles, startPortalParticleMaterial);
-        startPortalGroup.add(startPortalParticleSystem);
-
-        // Add portal group to scene
-        scene.add(startPortalGroup);
-
-        // Create portal collision box
-        startPortalBox = new THREE.Box3().setFromObject(startPortalGroup);
-
-        // Animate particles and portal and check for collision
-        function animateStartPortal() {
-            const positions = startPortalParticles.attributes.position.array;
-            for (let i = 0; i < positions.length; i += 3) {
-                positions[i + 1] += 0.05 * Math.sin(Date.now() * 0.001 + i);
-            }
-            startPortalParticles.attributes.position.needsUpdate = true;
-            // Update portal shader time
-            if (startPortalInnerMaterial.uniforms && startPortalInnerMaterial.uniforms.time) {
-                startPortalInnerMaterial.uniforms.time.value = Date.now() * 0.001;
-            }
-
-            requestAnimationFrame(animateStartPortal);
-        }
-        animateStartPortal();
-    // </create start portal>
-}
-
-// <create exit portal>
+// Create exit portal
+function createExitPortal() {
+    console.log("Creating exit portal");
     // Create portal group to contain all portal elements
     const exitPortalGroup = new THREE.Group();
-    exitPortalGroup.position.set(-200, 20, -300);
+    exitPortalGroup.position.set(-200, 25, -300);
     exitPortalGroup.rotation.x = 0.35;
     exitPortalGroup.rotation.y = 0;
 
@@ -1268,8 +1223,9 @@ if (new URLSearchParams(window.location.search).get('portal')) {
     scene.add(exitPortalGroup);
 
     // Create portal collision box
-    const exitPortalBox = new THREE.Box3().setFromObject(exitPortalGroup);
-
+    exitPortalBox = new THREE.Box3().setFromObject(exitPortalGroup);
+    console.log("Exit portal box created at:", exitPortalGroup.position);
+    
     // Animate particles and portal and check for collision
     function animateExitPortal() {
         const positions = exitPortalParticles.attributes.position.array;
@@ -1285,4 +1241,95 @@ if (new URLSearchParams(window.location.search).get('portal')) {
         requestAnimationFrame(animateExitPortal);
     }
     animateExitPortal();
-// </create exit portal>
+}
+
+// Create start portal (only when coming from another portal)
+function createStartPortal() {
+    // Only create start portal if coming from another portal
+    if (new URLSearchParams(window.location.search).get('portal')) {
+        console.log("Creating start portal");
+        // Create portal group to contain all portal elements
+        const startPortalGroup = new THREE.Group();
+        startPortalGroup.position.set(0, 5, 0);
+        startPortalGroup.rotation.x = 0.35;
+        startPortalGroup.rotation.y = 0;
+
+        // Create portal effect
+        const startPortalGeometry = new THREE.TorusGeometry(15, 2, 16, 100);
+        const startPortalMaterial = new THREE.MeshPhongMaterial({
+            color: 0xff0000,
+            emissive: 0xff0000,
+            transparent: true,
+            opacity: 0.8
+        });
+        const startPortal = new THREE.Mesh(startPortalGeometry, startPortalMaterial);
+        startPortalGroup.add(startPortal);
+                        
+        // Create portal inner surface
+        const startPortalInnerGeometry = new THREE.CircleGeometry(13, 32);
+        const startPortalInnerMaterial = new THREE.MeshBasicMaterial({
+            color: 0xff0000,
+            transparent: true,
+            opacity: 0.5,
+            side: THREE.DoubleSide
+        });
+        const startPortalInner = new THREE.Mesh(startPortalInnerGeometry, startPortalInnerMaterial);
+        startPortalGroup.add(startPortalInner);
+
+        // Create particle system for portal effect
+        const startPortalParticleCount = 1000;
+        const startPortalParticles = new THREE.BufferGeometry();
+        const startPortalPositions = new Float32Array(startPortalParticleCount * 3);
+        const startPortalColors = new Float32Array(startPortalParticleCount * 3);
+
+        for (let i = 0; i < startPortalParticleCount * 3; i += 3) {
+            // Create particles in a ring around the portal
+            const angle = Math.random() * Math.PI * 2;
+            const radius = 15 + (Math.random() - 0.5) * 4;
+            startPortalPositions[i] = Math.cos(angle) * radius;
+            startPortalPositions[i + 1] = Math.sin(angle) * radius;
+            startPortalPositions[i + 2] = (Math.random() - 0.5) * 4;
+
+            // Red color with slight variation
+            startPortalColors[i] = 0.8 + Math.random() * 0.2;
+            startPortalColors[i + 1] = 0;
+            startPortalColors[i + 2] = 0;
+        }
+
+        startPortalParticles.setAttribute('position', new THREE.BufferAttribute(startPortalPositions, 3));
+        startPortalParticles.setAttribute('color', new THREE.BufferAttribute(startPortalColors, 3));
+
+        const startPortalParticleMaterial = new THREE.PointsMaterial({
+            size: 0.2,
+            vertexColors: true,
+            transparent: true,
+            opacity: 0.6
+        });
+
+        const startPortalParticleSystem = new THREE.Points(startPortalParticles, startPortalParticleMaterial);
+        startPortalGroup.add(startPortalParticleSystem);
+
+        // Add portal group to scene
+        scene.add(startPortalGroup);
+
+        // Create portal collision box
+        startPortalBox = new THREE.Box3().setFromObject(startPortalGroup);
+        console.log("Start portal box created at:", startPortalGroup.position);
+
+        // Animate particles and portal and check for collision
+        function animateStartPortal() {
+            const positions = startPortalParticles.attributes.position.array;
+            for (let i = 0; i < positions.length; i += 3) {
+                positions[i + 1] += 0.05 * Math.sin(Date.now() * 0.001 + i);
+            }
+            startPortalParticles.attributes.position.needsUpdate = true;
+            // Update portal shader time
+            if (startPortalInnerMaterial.uniforms && startPortalInnerMaterial.uniforms.time) {
+                startPortalInnerMaterial.uniforms.time.value = Date.now() * 0.001;
+            }
+
+            requestAnimationFrame(animateStartPortal);
+        }
+        animateStartPortal();
+    }
+}
