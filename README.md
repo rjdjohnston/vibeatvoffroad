@@ -104,6 +104,57 @@ The ATV physics system has been tuned for an arcade-style driving experience wit
 - Widened chassis for better stability
 - Responsive controls for fun gameplay
 
+## Ramp Creation Functions
+
+The game provides two specialized functions for creating ramps with different properties:
+
+### `createRamp(x, z, width, height, depth, angle, axis, color)`
+
+Creates a standard ramp with rotation on a specified axis.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | Number | X position of the ramp |
+| `z` | Number | Z position of the ramp |
+| `width` | Number | Width of the ramp in game units |
+| `height` | Number | Height of the ramp in game units |
+| `depth` | Number | Depth/length of the ramp in game units |
+| `angle` | Number | Angle of inclination in radians (typically Math.PI/12 for a 15° slope) |
+| `axis` | String | Axis of rotation: 'x' for north/south facing ramps, 'z' for east/west facing ramps |
+| `color` | Hex | Hexadecimal color code (e.g., 0xFF0000 for red) |
+
+Example usage:
+```javascript
+// Create a north-facing red ramp
+createRamp(0, 680, 40, 15, 50, Math.PI/12, 'x', 0xFF0000);
+
+// Create a west-facing yellow ramp
+createRamp(-50, -50, 30, 15, 50, Math.PI/12, 'z', 0xFFFF00);
+```
+
+### `createPortalRamp(x, z, width, height, depth, angle, elevation, color)`
+
+Creates an elevated ramp with customizable height above ground, always rotated on the x-axis.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `x` | Number | X position of the ramp |
+| `z` | Number | Z position of the ramp |
+| `width` | Number | Width of the ramp in game units |
+| `height` | Number | Height/thickness of the ramp in game units |
+| `depth` | Number | Depth/length of the ramp in game units |
+| `angle` | Number | Angle of inclination in radians |
+| `elevation` | Number | Height above ground level in game units |
+| `color` | Hex | Hexadecimal color code (e.g., 0x8A2BE2 for purple) |
+
+Example usage:
+```javascript
+// Create a purple portal ramp elevated 2 units above ground
+createPortalRamp(-200, -250, 45, 5, 60, Math.PI/12, 2, 0x8A2BE2);
+```
+
+Both functions create physics bodies with proper collision detection and visual meshes with matching appearance.
+
 ## Project Structure
 
 - `server.js`: Backend server using Express and Socket.IO
