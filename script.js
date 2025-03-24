@@ -141,7 +141,7 @@ let trackCollider;
 
 // Background (Desert Image JPG)
 let skybox;
-console.log('Starting skybox load...');
+// console.log('Starting skybox load...');
 textureLoader.load(
     'assets/desert_image.jpg',
     (texture) => {
@@ -154,15 +154,15 @@ textureLoader.load(
         skybox = new THREE.Mesh(geometry, material);
         skybox.position.set(0, 0, 0);
         scene.add(skybox);
-        console.log('Desert skybox loaded at:', skybox.position, 'Scale:', skybox.scale);
-        console.log('Scene children after adding skybox:', scene.children.length);
+        // console.log('Desert skybox loaded at:', skybox.position, 'Scale:', skybox.scale);
+        // console.log('Scene children after adding skybox:', scene.children.length);
     },
     (progress) => console.log('Loading skybox progress:', progress.loaded / progress.total * 100 + '%'),
     (error) => console.error('Skybox loading failed:', error)
 );
 
 // Load 3D Race Track Model
-console.log('Loading 3D race track model...');
+// console.log('Loading 3D race track model...');
 gltfLoader.load(
     'models/tracks/drift_race_track.glb',
     (gltf) => {
@@ -181,7 +181,7 @@ gltfLoader.load(
         // Add to scene
         scene.add(trackMesh);
         
-        console.log('3D track model loaded successfully:', trackMesh);
+        // console.log('3D track model loaded successfully:', trackMesh);
         
         // Add physics for the track using a simplified approach
         createTrackPhysics(trackMesh);
@@ -200,7 +200,7 @@ gltfLoader.load(
 
 // Function to create physics for the track
 function createTrackPhysics(trackModel) {
-    console.log("Creating physics for track model");
+    // console.log("Creating physics for track model");
     
     // First, we'll create a series of box colliders that approximate the track surface
     // This is more reliable than trying to create a trimesh from the complex geometry
@@ -239,11 +239,11 @@ function createTrackPhysics(trackModel) {
         }
     });
     
-    console.log("Track bounding box:", 
-        "X:", minX, "to", maxX,
-        "Y:", minY, "to", maxY,
-        "Z:", minZ, "to", maxZ
-    );
+    // console.log("Track bounding box:", 
+    //     "X:", minX, "to", maxX,
+    //     "Y:", minY, "to", maxY,
+    //     "Z:", minZ, "to", maxZ
+    // );
     
     // Calculate track dimensions from the actual bounding box
     // Expand the size by a multiplier to ensure it covers the visual area
@@ -266,11 +266,11 @@ function createTrackPhysics(trackModel) {
     world.addBody(trackPhysicsBody);
     trackCollider = trackPhysicsBody;
     
-    console.log("Added main track collider with dimensions:", 
-        "Width:", trackWidth * 6, 
-        "Length:", trackLength * 6,
-        "Position:", trackPhysicsBody.position
-    );
+    // console.log("Added main track collider with dimensions:", 
+    //     "Width:", trackWidth * 6, 
+    //     "Length:", trackLength * 6,
+    //     "Position:", trackPhysicsBody.position
+    // );
     
     // Create invisible walls around the track to keep the ATV from falling off
     const wallHeight = 5;
@@ -310,12 +310,12 @@ function createTrackPhysics(trackModel) {
     westWallBody.position.set(negWallX, centerY + wallHeight, centerZ);
     world.addBody(westWallBody);
     
-    console.log("Added wall colliders at edges:", 
-        "North:", wallZ, 
-        "South:", negWallZ, 
-        "East:", wallX, 
-        "West:", negWallX
-    );
+    // console.log("Added wall colliders at edges:", 
+    //     "North:", wallZ, 
+    //     "South:", negWallZ, 
+    //     "East:", wallX, 
+    //     "West:", negWallX
+    // );
     
     // Create a debug visual to see the physics shape
     const debugGeometry = new THREE.BoxGeometry(trackWidth * 2, trackHeight * 2, trackLength * 2);
@@ -436,7 +436,7 @@ function createTrackPhysics(trackModel) {
         spotLight.distance = 100;
         scene.add(spotLight);
         
-        console.log(`Created ramp at (${x}, ${yPos}, ${z}) with rotation ${angle} on ${axis} axis`);
+        // console.log(`Created ramp at (${x}, ${yPos}, ${z}) with rotation ${angle} on ${axis} axis`);
     }
     
     // Function for creating elevated portal ramps with custom parameters
@@ -481,7 +481,7 @@ function createTrackPhysics(trackModel) {
         spotLight.distance = 100;
         scene.add(spotLight);
         
-        console.log(`Created portal ramp at (${x}, ${yPos}, ${z}) with elevation ${elevation}, angle ${angle}`);
+        // console.log(`Created portal ramp at (${x}, ${yPos}, ${z}) with elevation ${elevation}, angle ${angle}`);
         
         // Return the mesh in case it's needed for reference
         return rampMesh;
@@ -504,7 +504,7 @@ function createTrackPhysics(trackModel) {
     // Portal ramp - leading up to the exit portal (purple)
     createPortalRamp(-200, -250, 45, 5, 60, Math.PI/12, 2, 0x8A2BE2); // Purple
     
-    console.log("Track physics created");
+    // console.log("Track physics created");
 }
 
 // Create a simple ground plane as fallback (positioned much lower as a safety net)
@@ -580,7 +580,7 @@ gltfLoader.load(
         atvMesh.position.y += 1.7;
         atvMesh.quaternion.copy(chassisBody.quaternion);
         
-        console.log('ATV loaded successfully');
+        // console.log('ATV loaded successfully');
         
         // Initialize multiplayer after ATV is loaded
         if (gameStarted) {
@@ -594,7 +594,7 @@ gltfLoader.load(
 // Initialize multiplayer
 function initializeMultiplayer() {
     if (!multiplayerManager && atvMesh && gameStarted) {
-        console.log("Initializing multiplayer with player name:", playerName);
+        // console.log("Initializing multiplayer with player name:", playerName);
         multiplayerManager = new MultiplayerManager(scene, chassisBody, atvMesh, playerName);
         multiplayerManager.init();
     }
@@ -604,7 +604,7 @@ function initializeMultiplayer() {
 gltfLoader.load(
     'assets/survival/scene.gltf',
     (gltf) => {
-        console.log('Survival GLTF loaded:', gltf);
+        // console.log('Survival GLTF loaded:', gltf);
         const assets = gltf.scene;
 
         const tireMesh = assets.getObjectByName('opon_Material002_0');
@@ -620,7 +620,7 @@ gltfLoader.load(
             if (node.isMesh && node.material) {
                 node.material.emissive = new THREE.Color(0x202020);
                 node.material.emissiveIntensity = 0.5;
-                console.log(`Material for ${node.name}:`, node.material);
+                // console.log(`Material for ${node.name}:`, node.material);
             }
         });
 
@@ -634,7 +634,7 @@ gltfLoader.load(
                 tireBody.addShape(new CANNON.Box(new CANNON.Vec3(0.37, 0.37, 0.16)));
                 tireBody.position.copy(tireClone.position);
                 world.addBody(tireBody);
-                console.log('Tire placed at:', tireClone.position);
+                // console.log('Tire placed at:', tireClone.position);
             }
 
             const barrelClone = barrelMesh.clone();
@@ -646,7 +646,7 @@ gltfLoader.load(
                 barrelBody.addShape(new CANNON.Box(new CANNON.Vec3(0.27, 0.27, 0.44)));
                 barrelBody.position.copy(barrelClone.position);
                 world.addBody(barrelBody);
-                console.log('Barrel placed at:', barrelClone.position);
+                // console.log('Barrel placed at:', barrelClone.position);
             }
         }
 
@@ -662,7 +662,7 @@ gltfLoader.load(
                 barrelBody.addShape(new CANNON.Box(new CANNON.Vec3(0.27, 0.27, 0.44)));
                 barrelBody.position.copy(barrelClone.position);
                 world.addBody(barrelBody);
-                console.log('Extra barrel placed near track at:', barrelClone.position);
+                // console.log('Extra barrel placed near track at:', barrelClone.position);
             }
         }
 
@@ -680,10 +680,10 @@ gltfLoader.load(
             body.addShape(new CANNON.Box(asset.size));
             body.position.copy(clone.position);
             world.addBody(body);
-            console.log(`${asset.mesh.name} placed on track at:`, clone.position);
+            // console.log(`${asset.mesh.name} placed on track at:`, clone.position);
         });
 
-        console.log('Survival assets loaded and placed');
+        // console.log('Survival assets loaded and placed');
     },
     (progress) => console.log('Loading survival assets:', progress.loaded / progress.total * 100 + '%'),
     (error) => console.error('Survival assets loading failed:', error)
@@ -880,7 +880,7 @@ function animate() {
         settled = false;
         chassisBody.linearDamping = 0.9;
         chassisBody.angularDamping = 0.9;
-        console.log('ATV reset to starting position');
+        // console.log('ATV reset to starting position');
     }
     
     // Check if ATV is flipped upside down
@@ -956,7 +956,7 @@ function updateHUD() {
 }
 
 function vibeVerse() {
-    console.log("vibeVerse function called");
+    // console.log("vibeVerse function called");
     if (new URLSearchParams(window.location.search).get('portal')) {
         // <check if player has entered start portal>
             setTimeout(function() {
@@ -992,7 +992,7 @@ function vibeVerse() {
 
     // <check if player has entered exit portal>
         if (typeof atvMesh !== 'undefined' && atvMesh) {
-            console.log("ATV mesh check passed");
+            // console.log("ATV mesh check passed");
             const playerBox = new THREE.Box3().setFromObject(atvMesh);
             // Check if player is within 50 units of the portal
             if (typeof exitPortalBox === 'undefined') {
@@ -1001,16 +1001,16 @@ function vibeVerse() {
             }
             const portalCenter = exitPortalBox.getCenter(new THREE.Vector3());
             const playerCenter = playerBox.getCenter(new THREE.Vector3());
-            console.log("Player position:", playerCenter);
-            console.log("Portal position:", portalCenter);
+            // console.log("Player position:", playerCenter);
+            // console.log("Portal position:", portalCenter);
             const portalDistance = playerCenter.distanceTo(portalCenter);
-            console.log("Distance to portal:", portalDistance);
+            // console.log("Distance to portal:", portalDistance);
             
             if (portalDistance < 50) {
-                console.log("Player is within 50 units of portal");
+                // console.log("Player is within 50 units of portal");
                 // Calculate current speed from vehicle velocity
                 const currentSpeed = Math.round(chassisBody.velocity.length());
-                console.log("Current speed:", currentSpeed);
+                // console.log("Current speed:", currentSpeed);
                 
                 // Start loading the next page in the background
                 const currentParams = new URLSearchParams(window.location.search);
@@ -1033,12 +1033,12 @@ function vibeVerse() {
                     iframe.style.display = 'none';
                     iframe.src = nextPage;
                     document.body.appendChild(iframe);
-                    console.log("Preloading next page:", nextPage);
+                    // console.log("Preloading next page:", nextPage);
                 }
 
                 // Only redirect once actually in the portal
                 if (playerBox.intersectsBox(exitPortalBox)) {
-                    console.log("Portal intersection detected! Redirecting to:", nextPage);
+                    // console.log("Portal intersection detected! Redirecting to:", nextPage);
                     window.location.href = nextPage;
                 }
             }
@@ -1136,7 +1136,7 @@ function updatePlayerListUI() {
 
 // Create exit portal
 function createExitPortal() {
-    console.log("Creating exit portal");
+    // console.log("Creating exit portal");
     // Create portal group to contain all portal elements
     const exitPortalGroup = new THREE.Group();
     exitPortalGroup.position.set(-200, 25, -300);
@@ -1224,7 +1224,7 @@ function createExitPortal() {
 
     // Create portal collision box
     exitPortalBox = new THREE.Box3().setFromObject(exitPortalGroup);
-    console.log("Exit portal box created at:", exitPortalGroup.position);
+    // console.log("Exit portal box created at:", exitPortalGroup.position);
     
     // Animate particles and portal and check for collision
     function animateExitPortal() {
@@ -1247,7 +1247,7 @@ function createExitPortal() {
 function createStartPortal() {
     // Only create start portal if coming from another portal
     if (new URLSearchParams(window.location.search).get('portal')) {
-        console.log("Creating start portal");
+        // console.log("Creating start portal");
         // Create portal group to contain all portal elements
         const startPortalGroup = new THREE.Group();
         startPortalGroup.position.set(0, 5, 0);
@@ -1314,7 +1314,7 @@ function createStartPortal() {
 
         // Create portal collision box
         startPortalBox = new THREE.Box3().setFromObject(startPortalGroup);
-        console.log("Start portal box created at:", startPortalGroup.position);
+        // console.log("Start portal box created at:", startPortalGroup.position);
 
         // Animate particles and portal and check for collision
         function animateStartPortal() {
