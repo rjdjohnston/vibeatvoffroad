@@ -170,21 +170,25 @@ function setupTouchControls() {
     // Touch event handlers for accelerator and brake buttons
     acceleratorButton.addEventListener('touchstart', (e) => { 
         e.preventDefault();
+        e.stopPropagation(); // Prevent event bubbling
         controls.forward = true; 
         acceleratorButton.style.transform = 'scale(0.9)';
     });
     acceleratorButton.addEventListener('touchend', (e) => { 
         e.preventDefault();
+        e.stopPropagation(); // Prevent event bubbling
         controls.forward = false; 
         acceleratorButton.style.transform = 'scale(1)';
     });
     brakeButton.addEventListener('touchstart', (e) => { 
         e.preventDefault();
+        e.stopPropagation(); // Prevent event bubbling
         controls.backward = true; 
         brakeButton.style.transform = 'scale(0.9)';
     });
     brakeButton.addEventListener('touchend', (e) => { 
         e.preventDefault();
+        e.stopPropagation(); // Prevent event bubbling
         controls.backward = false; 
         brakeButton.style.transform = 'scale(1)';
     });
@@ -403,6 +407,23 @@ function setupTouchControls() {
         
         // Disable device orientation steering when joystick is active
         useDeviceOrientation = false;
+        
+        // Get the initial touch position and update joystick
+        if (e.touches && e.touches[0]) {
+            const touch = e.touches[0];
+            const rect = joystickBase.getBoundingClientRect();
+            
+            // Calculate touch position relative to joystick center
+            let x = touch.clientX - rect.left - centerX;
+            let y = touch.clientY - rect.top - centerY;
+            
+            // Store this as the initial position
+            joystickPosition.x = x;
+            joystickPosition.y = y;
+            
+            // Immediately update the joystick position
+            handleJoystickMove(e);
+        }
     }
     
     function handleJoystickMove(e) {
@@ -425,8 +446,8 @@ function setupTouchControls() {
             y = (y / distance) * maxDistance;
         }
         
-        // Move joystick thumb
-        joystickThumb.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+        // Move joystick thumb - add translateZ(0) to force hardware acceleration
+        joystickThumb.style.transform = `translate3d(calc(-50% + ${x}px), calc(-50% + ${y}px), 0)`;
         
         // Normalize x to a range of -1 to 1 for steering
         const normalizedX = x / maxDistance;
