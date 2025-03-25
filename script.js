@@ -2935,7 +2935,7 @@ function showCheckpointMessage(checkpointIndex) {
     document.body.appendChild(message);
     
     // Shorter display time on mobile
-    const displayTime = isMobile ? 800 : 1000;
+    const displayTime = isMobile ? 400 : 1000;
     
     // Fade out and remove
     setTimeout(() => {
@@ -3001,12 +3001,17 @@ function showLapTimeMessage(lapTime, isBest) {
 
 // Update the checkpoint UI
 function updateCheckpointUI() {
+    const isMobile = window.isMobileDevice;
     // Create UI if it doesn't exist
     if (!document.getElementById('checkpoint-status')) {
         const checkpointStatus = document.createElement('div');
         checkpointStatus.id = 'checkpoint-status';
         checkpointStatus.style.position = 'absolute';
-        checkpointStatus.style.top = '20px';
+        if (isMobile) {
+            checkpointStatus.style.top = '10px';
+        } else {
+            checkpointStatus.style.top = '20px';            
+        }
         checkpointStatus.style.left = '180px';
         checkpointStatus.style.color = 'white';
         checkpointStatus.style.background = 'rgba(0, 0, 0, 0.5)';
@@ -3027,7 +3032,11 @@ function updateCheckpointUI() {
         const lapTimeDisplay = document.createElement('div');
         lapTimeDisplay.id = 'lap-time';
         lapTimeDisplay.style.position = 'absolute';
-        lapTimeDisplay.style.top = '20px';
+        if (isMobile) {
+            lapTimeDisplay.style.top = '10px';
+        } else {
+            lapTimeDisplay.style.top = '20px';            
+        }
         lapTimeDisplay.style.left = '330px';
         lapTimeDisplay.style.color = 'white';
         lapTimeDisplay.style.background = 'rgba(0, 0, 0, 0.5)';
