@@ -149,232 +149,218 @@ document.addEventListener('keyup', (event) => {
 
 // Setup touch controls for mobile devices
 function setupTouchControls() {
-    // Get the necessary DOM elements
     const joystickThumb = document.getElementById('joystick-thumb');
     const joystickBase = document.getElementById('joystick-base');
     const acceleratorButton = document.getElementById('accelerator-button');
     const brakeButton = document.getElementById('brake-button');
-    const mobileControls = document.getElementById('mobile-controls');
-    
-    // Make mobile controls visible
-    mobileControls.style.display = 'block';
     
     // Joystick variables
     let isDragging = false;
-    let joystickTouchId = null; // Store the specific touch ID for the joystick
+    const joystickBaseRect = joystickBase.getBoundingClientRect();
+    const centerX = joystickBaseRect.width / 2;
+    const centerY = joystickBaseRect.height / 2;
+    const maxDistance = joystickBaseRect.width / 2 - joystickThumb.clientWidth / 2;
     
-    // Show debug element for mobile testing
-    const debugElement = document.createElement('div');
-    debugElement.style.position = 'fixed';
-    debugElement.style.top = '10px';
-    debugElement.style.left = '10px';
-    debugElement.style.backgroundColor = 'rgba(0,0,0,0.5)';
-    debugElement.style.color = 'white';
-    debugElement.style.padding = '5px';
-    debugElement.style.zIndex = '1000';
-    debugElement.style.maxWidth = '80%';
-    debugElement.style.overflow = 'hidden';
-    document.body.appendChild(debugElement);
+    // Touch event handlers for joystick (steering)
+    joystickBase.addEventListener('touchstart', handleJoystickStart);
+    joystickBase.addEventListener('touchmove', handleJoystickMove);
+    joystickBase.addEventListener('touchend', handleJoystickEnd);
+    document.addEventListener('touchcancel', handleJoystickEnd);
     
-    function updateDebug(message) {
-        debugElement.textContent = message;
-    }
-    
-    // Button handlers - using separate functions to avoid confusion
-    function handleAcceleratorStart(e) {
+    // Touch event handlers for accelerator and brake buttons
+    acceleratorButton.addEventListener('touchstart', (e) => { 
         e.preventDefault();
-        controls.forward = true;
+        controls.forward = true; 
         acceleratorButton.style.transform = 'scale(0.9)';
-        updateDebug('Accelerator pressed');
-    }
-    
-    function handleAcceleratorEnd(e) {
+    });
+    acceleratorButton.addEventListener('touchend', (e) => { 
         e.preventDefault();
-        controls.forward = false;
+        controls.forward = false; 
         acceleratorButton.style.transform = 'scale(1)';
-        updateDebug('Accelerator released');
-    }
-    
-    function handleBrakeStart(e) {
+    });
+    brakeButton.addEventListener('touchstart', (e) => { 
         e.preventDefault();
-        controls.backward = true;
+        controls.backward = true; 
         brakeButton.style.transform = 'scale(0.9)';
-        updateDebug('Brake pressed');
-    }
-    
-    function handleBrakeEnd(e) {
+    });
+    brakeButton.addEventListener('touchend', (e) => { 
         e.preventDefault();
-        controls.backward = false;
+        controls.backward = false; 
         brakeButton.style.transform = 'scale(1)';
-        updateDebug('Brake released');
-    }
-    
-    // Attach button event listeners
-    acceleratorButton.addEventListener('touchstart', handleAcceleratorStart);
-    acceleratorButton.addEventListener('touchend', handleAcceleratorEnd);
-    acceleratorButton.addEventListener('touchcancel', handleAcceleratorEnd);
-    
-    brakeButton.addEventListener('touchstart', handleBrakeStart);
-    brakeButton.addEventListener('touchend', handleBrakeEnd);
-    brakeButton.addEventListener('touchcancel', handleBrakeEnd);
-    
-    // Joystick handlers
-    function handleJoystickStart(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        // Track that joystick is active and in use
-        isJoystickActive = true;
-        isDragging = true;
-        
-        const touch = e.touches[0];
-        initialX = touch.clientX;
-        initialY = touch.clientY;
-        
-        // Calculate joystick base position on screen
-        updateJoystickBasePosition();
-        
-        // Update joystick position with this touch
-        updateJoystickPosition(e, touch);
-        
-        updateDebug(`Joystick activated: ${initialX.toFixed(0)}, ${initialY.toFixed(0)}`);
-        
-        return false;
-    }
-    
-    function handleJoystickMove(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        if (!isDragging) return;
-        
-        const touch = e.touches[0];
-        updateJoystickPosition(e, touch);
-        
-        return false;
-    }
-    
-    function handleJoystickEnd(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        isDragging = false;
-        updateDebug('Joystick released');
-        
-        // Reset joystick position
-        joystickThumb.style.transform = 'translate(-50%, -50%)';
-        
-        // Reset left/right controls when joystick is released
-        controls.left = false;
-        controls.right = false;
-        
-        // Reset joystick position tracking
-        joystickPosition = { x: 0, y: 0 };
-        isJoystickActive = false;
-        
-        return false;
-    }
-    
-    // Function to update joystick base position
-    function updateJoystickBasePosition() {
-        const rect = joystickBase.getBoundingClientRect();
-        baseX = rect.left + rect.width / 2;
-        baseY = rect.top + rect.height / 2;
-    }
-    
-    // Function to update joystick position
-    function updateJoystickPosition(e, touch = null) {
-        if (!touch && e.touches && e.touches[0]) {
-            touch = e.touches[0];
-        }
-        
-        if (!touch) return;
-        
-        const currentX = touch.clientX;
-        const currentY = touch.clientY;
-        
-        // Calculate the distance from the center
-        const deltaX = currentX - baseX;
-        const deltaY = currentY - baseY;
-        
-        // Store the joystick position for tilt calculations
-        joystickPosition = { x: deltaX, y: deltaY };
-        
-        // Calculate maximum distance the joystick can move
-        const maxRadius = Math.min(joystickBase.clientWidth, joystickBase.clientHeight) / 3;
-        
-        // Calculate the distance from center
-        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-        
-        // Normalize to max radius if exceeding
-        let limitedX = deltaX;
-        let limitedY = deltaY;
-        
-        if (distance > maxRadius) {
-            const scale = maxRadius / distance;
-            limitedX = deltaX * scale;
-            limitedY = deltaY * scale;
-        }
-        
-        // Move joystick thumb
-        joystickThumb.style.transform = `translate(calc(-50% + ${limitedX}px), calc(-50% + ${limitedY}px))`;
-        
-        // Update controls based on joystick position
-        const joystickThreshold = 0.3; // Sensitivity threshold for controls
-        const normalizedX = limitedX / maxRadius; // -1 to 1
-        
-        // Update steering controls
-        if (normalizedX < -joystickThreshold) {
-            controls.left = true;
-            controls.right = false;
-            updateDebug(`Joystick left: ${normalizedX.toFixed(2)}`);
-        } else if (normalizedX > joystickThreshold) {
-            controls.right = true;
-            controls.left = false;
-            updateDebug(`Joystick right: ${normalizedX.toFixed(2)}`);
-        } else {
-            controls.left = false;
-            controls.right = false;
-            updateDebug(`Joystick center: ${normalizedX.toFixed(2)}`);
-        }
-    }
-    
-    // Attach joystick event listeners
-    joystickBase.addEventListener('touchstart', handleJoystickStart, { passive: false });
-    joystickBase.addEventListener('touchmove', handleJoystickMove, { passive: false });
-    joystickBase.addEventListener('touchend', handleJoystickEnd, { passive: false });
-    joystickBase.addEventListener('touchcancel', handleJoystickEnd, { passive: false });
-    
-    // Add touch prevention to stop browser behaviors that interfere with the game
-    document.addEventListener('touchmove', function(e) {
-        if (gameStarted) {
-            e.preventDefault();
-        }
-    }, { passive: false });
-    
-    // Prevent zooming
-    document.addEventListener('gesturestart', function(e) {
-        if (gameStarted) {
-            e.preventDefault();
-        }
     });
     
-    // Add a notification about the controls
-    const notification = document.getElementById('notifications');
-    const mobileControlsMsg = document.createElement('div');
-    mobileControlsMsg.className = 'notification';
-    mobileControlsMsg.style.animation = 'none';
-    mobileControlsMsg.style.opacity = '1';
-    mobileControlsMsg.innerHTML = 'Mobile controls: Use joystick to steer and buttons to accelerate/brake. Tilt device for alternative steering.';
-    notification.appendChild(mobileControlsMsg);
+    // Handle device orientation for tilt-based steering
+    if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        // iOS 13+ requires permission
+        const orientationButton = document.createElement('button');
+        orientationButton.id = 'orientation-permission';
+        orientationButton.innerText = 'Enable Tilt Steering';
+        orientationButton.style.position = 'absolute';
+        orientationButton.style.top = '50%';
+        orientationButton.style.left = '50%';
+        orientationButton.style.transform = 'translate(-50%, -50%)';
+        orientationButton.style.zIndex = '1000';
+        orientationButton.style.padding = '15px 25px';
+        orientationButton.style.backgroundColor = 'rgba(0, 100, 200, 0.8)';
+        orientationButton.style.color = 'white';
+        orientationButton.style.border = 'none';
+        orientationButton.style.borderRadius = '8px';
+        orientationButton.style.fontSize = '16px';
+        orientationButton.style.cursor = 'pointer';
+        
+        document.body.appendChild(orientationButton);
+        
+        // Improved click handler with better debugging
+        orientationButton.onclick = function() {
+            console.log('Tilt steering button clicked');
+            // Make the button visibly change to show it registered the click
+            this.style.backgroundColor = 'rgba(0, 200, 100, 0.8)';
+            this.innerText = 'Requesting permission...';
+            
+            // Make sure we're handling the permission request in a direct response to user interaction
+            try {
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        console.log('Permission response:', permissionState);
+                        if (permissionState === 'granted') {
+                            console.log('Device orientation permission granted');
+                            window.addEventListener('deviceorientation', handleOrientation);
+                            this.style.display = 'none';
+                            
+                            // Show confirmation message
+                            const notification = document.getElementById('notifications');
+                            const permissionMsg = document.createElement('div');
+                            permissionMsg.className = 'notification';
+                            permissionMsg.innerHTML = 'Tilt steering enabled! Tilt your device to steer.';
+                            notification.appendChild(permissionMsg);
+                        } else {
+                            // Permission denied, but we'll still enable manual tilt mode
+                            console.log('Permission denied, enabling manual tilt mode');
+                            this.style.backgroundColor = 'rgba(50, 150, 200, 0.8)';
+                            this.innerText = 'Use Manual Tilt';
+                            
+                            // Switch to manual mode on next click
+                            this.onclick = function() {
+                                enableManualTiltMode();
+                                this.style.display = 'none';
+                            };
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error requesting device orientation permission:', error);
+                        // Error occurred, but we'll still enable manual tilt mode
+                        this.style.backgroundColor = 'rgba(50, 150, 200, 0.8)';
+                        this.innerText = 'Use Manual Tilt';
+                        
+                        // Switch to manual mode on next click
+                        this.onclick = function() {
+                            enableManualTiltMode();
+                            this.style.display = 'none';
+                        };
+                    });
+            } catch (error) {
+                console.error('Exception when requesting permission:', error);
+                // Exception occurred, but we'll still enable manual tilt mode
+                this.style.backgroundColor = 'rgba(50, 150, 200, 0.8)';
+                this.innerText = 'Use Manual Tilt';
+                
+                // Switch to manual mode on next click
+                this.onclick = function() {
+                    enableManualTiltMode();
+                    this.style.display = 'none';
+                };
+            }
+            
+            return false; // Prevent any default behavior
+        };
+    } else if (window.DeviceOrientationEvent) {
+        // Non-iOS devices (Android, etc)
+        console.log('Setting up device orientation for non-iOS device');
+        
+        // Create a button to enable tilt on Android (some devices require user interaction)
+        const orientationButton = document.createElement('button');
+        orientationButton.id = 'orientation-permission';
+        orientationButton.innerText = 'Enable Tilt Steering';
+        orientationButton.style.position = 'absolute';
+        orientationButton.style.top = '50%';
+        orientationButton.style.left = '50%';
+        orientationButton.style.transform = 'translate(-50%, -50%)';
+        orientationButton.style.zIndex = '1000';
+        orientationButton.style.padding = '15px 25px';
+        orientationButton.style.backgroundColor = 'rgba(0, 100, 200, 0.8)';
+        orientationButton.style.color = 'white';
+        orientationButton.style.border = 'none';
+        orientationButton.style.borderRadius = '8px';
+        orientationButton.style.fontSize = '16px';
+        orientationButton.style.cursor = 'pointer';
+        
+        document.body.appendChild(orientationButton);
+        
+        orientationButton.onclick = function() {
+            // For Android and other devices, just try to add the listener on user interaction
+            window.addEventListener('deviceorientation', handleOrientation);
+            this.style.display = 'none';
+            
+            // Show confirmation
+            const notification = document.getElementById('notifications');
+            const permissionMsg = document.createElement('div');
+            permissionMsg.className = 'notification';
+            permissionMsg.innerHTML = 'Tilt steering enabled! Tilt your device to steer.';
+            notification.appendChild(permissionMsg);
+        };
+    } else {
+        console.log('Device orientation not supported on this device');
+        
+        // Offer manual tilt mode
+        const orientationButton = document.createElement('button');
+        orientationButton.id = 'orientation-permission';
+        orientationButton.innerText = 'Use Manual Tilt';
+        orientationButton.style.position = 'absolute';
+        orientationButton.style.top = '50%';
+        orientationButton.style.left = '50%';
+        orientationButton.style.transform = 'translate(-50%, -50%)';
+        orientationButton.style.zIndex = '1000';
+        orientationButton.style.padding = '15px 25px';
+        orientationButton.style.backgroundColor = 'rgba(50, 150, 200, 0.8)';
+        orientationButton.style.color = 'white';
+        orientationButton.style.border = 'none';
+        orientationButton.style.borderRadius = '8px';
+        orientationButton.style.fontSize = '16px';
+        orientationButton.style.cursor = 'pointer';
+        
+        document.body.appendChild(orientationButton);
+        
+        orientationButton.onclick = function() {
+            enableManualTiltMode();
+            this.style.display = 'none';
+        };
+    }
     
-    // Remove the message after 10 seconds
-    setTimeout(() => {
-        mobileControlsMsg.style.animation = 'fadeOut 2s forwards';
-        setTimeout(() => {
-            notification.removeChild(mobileControlsMsg);
-        }, 2000);
-    }, 10000);
+    // Function to enable manual tilt mode (using joystick for tilt instead of device orientation)
+    function enableManualTiltMode() {
+        console.log('Enabling manual tilt mode');
+        
+        // Show confirmation
+        const notification = document.getElementById('notifications');
+        const manualMsg = document.createElement('div');
+        manualMsg.className = 'notification';
+        manualMsg.innerHTML = 'Manual tilt mode enabled! Use joystick for dramatic tilting.';
+        notification.appendChild(manualMsg);
+        
+        // We'll use the existing handleJoystickMove with enhanced tilt effects
+        const originalJoystickMove = handleJoystickMove;
+        
+        // Override joystick handler to include more dramatic tilting
+        handleJoystickMove = function(e) {
+            originalJoystickMove.call(this, e);
+            
+            // Add extra tilt effect based on joystick position
+            if (atvBody && isJoystickActive) {
+                const joystickTilt = joystickPosition.x / maxDistance * 2; // -2 to 2 range
+                manualTiltValue = joystickTilt;
+            }
+        };
+    }
     
     // Tilt related variables
     let tiltSensitivity = 0.7; // Increased sensitivity (0-1)
@@ -411,182 +397,107 @@ function setupTouchControls() {
         }
     }
     
-    // Handle device orientation permission for iOS devices
-    if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        // iOS 13+ requires permission
-        const orientationButton = document.createElement('button');
-        orientationButton.id = 'orientation-permission';
-        orientationButton.innerText = 'Enable Tilt Steering';
-        orientationButton.style.position = 'absolute';
-        orientationButton.style.top = '50%';
-        orientationButton.style.left = '50%';
-        orientationButton.style.transform = 'translate(-50%, -50%)';
-        orientationButton.style.zIndex = '1000';
-        orientationButton.style.padding = '15px 25px';
-        orientationButton.style.backgroundColor = 'rgba(0, 100, 200, 0.8)';
-        orientationButton.style.color = 'white';
-        orientationButton.style.border = 'none';
-        orientationButton.style.borderRadius = '8px';
-        orientationButton.style.fontSize = '16px';
-        orientationButton.style.cursor = 'pointer';
+    function handleJoystickStart(e) {
+        e.preventDefault();
+        isDragging = true;
         
-        document.body.appendChild(orientationButton);
-        
-        // Improved click handler with better debugging
-        orientationButton.onclick = function() {
-            updateDebug('Tilt steering button clicked');
-            // Make the button visibly change to show it registered the click
-            this.style.backgroundColor = 'rgba(0, 200, 100, 0.8)';
-            this.innerText = 'Requesting permission...';
-            
-            // Make sure we're handling the permission request in a direct response to user interaction
-            try {
-                DeviceOrientationEvent.requestPermission()
-                    .then(permissionState => {
-                        updateDebug('Permission response: ' + permissionState);
-                        if (permissionState === 'granted') {
-                            updateDebug('Device orientation permission granted');
-                            window.addEventListener('deviceorientation', handleOrientation);
-                            this.style.display = 'none';
-                            
-                            // Show confirmation message
-                            const notification = document.getElementById('notifications');
-                            const permissionMsg = document.createElement('div');
-                            permissionMsg.className = 'notification';
-                            permissionMsg.innerHTML = 'Tilt steering enabled! Tilt your device to steer.';
-                            notification.appendChild(permissionMsg);
-                        } else {
-                            // Permission denied, but we'll still enable manual tilt mode
-                            updateDebug('Permission denied, enabling manual tilt mode');
-                            this.style.backgroundColor = 'rgba(50, 150, 200, 0.8)';
-                            this.innerText = 'Use Manual Tilt';
-                            
-                            // Switch to manual mode on next click
-                            this.onclick = function() {
-                                enableManualTiltMode();
-                                this.style.display = 'none';
-                            };
-                        }
-                    })
-                    .catch(error => {
-                        updateDebug('Error requesting permission: ' + error.toString());
-                        // Error occurred, but we'll still enable manual tilt mode
-                        this.style.backgroundColor = 'rgba(50, 150, 200, 0.8)';
-                        this.innerText = 'Use Manual Tilt';
-                        
-                        // Switch to manual mode on next click
-                        this.onclick = function() {
-                            enableManualTiltMode();
-                            this.style.display = 'none';
-                        };
-                    });
-            } catch (error) {
-                updateDebug('Exception when requesting permission: ' + error.toString());
-                // Exception occurred, but we'll still enable manual tilt mode
-                this.style.backgroundColor = 'rgba(50, 150, 200, 0.8)';
-                this.innerText = 'Use Manual Tilt';
-                
-                // Switch to manual mode on next click
-                this.onclick = function() {
-                    enableManualTiltMode();
-                    this.style.display = 'none';
-                };
-            }
-            
-            return false; // Prevent any default behavior
-        };
-    } else if (window.DeviceOrientationEvent) {
-        // Non-iOS devices (Android, etc)
-        updateDebug('Setting up device orientation for non-iOS device');
-        
-        // Create a button to enable tilt on Android (some devices require user interaction)
-        const orientationButton = document.createElement('button');
-        orientationButton.id = 'orientation-permission';
-        orientationButton.innerText = 'Enable Tilt Steering';
-        orientationButton.style.position = 'absolute';
-        orientationButton.style.top = '50%';
-        orientationButton.style.left = '50%';
-        orientationButton.style.transform = 'translate(-50%, -50%)';
-        orientationButton.style.zIndex = '1000';
-        orientationButton.style.padding = '15px 25px';
-        orientationButton.style.backgroundColor = 'rgba(0, 100, 200, 0.8)';
-        orientationButton.style.color = 'white';
-        orientationButton.style.border = 'none';
-        orientationButton.style.borderRadius = '8px';
-        orientationButton.style.fontSize = '16px';
-        orientationButton.style.cursor = 'pointer';
-        
-        document.body.appendChild(orientationButton);
-        
-        orientationButton.onclick = function() {
-            // For Android and other devices, just try to add the listener on user interaction
-            window.addEventListener('deviceorientation', handleOrientation);
-            this.style.display = 'none';
-            
-            // Show confirmation
-            const notification = document.getElementById('notifications');
-            const permissionMsg = document.createElement('div');
-            permissionMsg.className = 'notification';
-            permissionMsg.innerHTML = 'Tilt steering enabled! Tilt your device to steer.';
-            notification.appendChild(permissionMsg);
-            
-            updateDebug('Tilt steering enabled on Android');
-        };
-    } else {
-        updateDebug('Device orientation not supported on this device');
-        
-        // Offer manual tilt mode
-        const orientationButton = document.createElement('button');
-        orientationButton.id = 'orientation-permission';
-        orientationButton.innerText = 'Use Manual Tilt';
-        orientationButton.style.position = 'absolute';
-        orientationButton.style.top = '50%';
-        orientationButton.style.left = '50%';
-        orientationButton.style.transform = 'translate(-50%, -50%)';
-        orientationButton.style.zIndex = '1000';
-        orientationButton.style.padding = '15px 25px';
-        orientationButton.style.backgroundColor = 'rgba(50, 150, 200, 0.8)';
-        orientationButton.style.color = 'white';
-        orientationButton.style.border = 'none';
-        orientationButton.style.borderRadius = '8px';
-        orientationButton.style.fontSize = '16px';
-        orientationButton.style.cursor = 'pointer';
-        
-        document.body.appendChild(orientationButton);
-        
-        orientationButton.onclick = function() {
-            enableManualTiltMode();
-            this.style.display = 'none';
-        };
+        // Disable device orientation steering when joystick is active
+        useDeviceOrientation = false;
     }
     
-    // Function to enable manual tilt mode (using joystick for tilt instead of device orientation)
-    function enableManualTiltMode() {
-        updateDebug('Enabling manual tilt mode');
+    function handleJoystickMove(e) {
+        e.preventDefault();
+        if (!isDragging) return;
         
-        // Show confirmation
-        const notification = document.getElementById('notifications');
-        const manualMsg = document.createElement('div');
-        manualMsg.className = 'notification';
-        manualMsg.innerHTML = 'Manual tilt mode enabled! Use joystick for dramatic tilting.';
-        notification.appendChild(manualMsg);
+        const touch = e.touches[0];
+        const rect = joystickBase.getBoundingClientRect();
         
-        // Save original joystick position update
-        const originalUpdateJoystickPosition = updateJoystickPosition;
+        // Calculate touch position relative to joystick center
+        let x = touch.clientX - rect.left - centerX;
+        let y = touch.clientY - rect.top - centerY;
         
-        // Override joystick position update function
-        updateJoystickPosition = function(e, touch = null) {
-            // Call the original function first
-            originalUpdateJoystickPosition.call(this, e, touch);
-            
-            // Add extra tilt effect based on joystick position
-            if (atvBody && isJoystickActive) {
-                const joystickTilt = joystickPosition.x / (Math.min(joystickBase.clientWidth, joystickBase.clientHeight) / 3) * 2; // -2 to 2 range
-                manualTiltValue = joystickTilt;
-                updateDebug('Manual tilt: ' + manualTiltValue.toFixed(2));
-            }
-        };
+        // Calculate distance from center
+        const distance = Math.sqrt(x * x + y * y);
+        
+        // If touch is outside the max distance, normalize it
+        if (distance > maxDistance) {
+            x = (x / distance) * maxDistance;
+            y = (y / distance) * maxDistance;
+        }
+        
+        // Move joystick thumb
+        joystickThumb.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+        
+        // Normalize x to a range of -1 to 1 for steering
+        const normalizedX = x / maxDistance;
+        
+        // Apply some deadzone to prevent unintended steering
+        if (Math.abs(normalizedX) < 0.15) {
+            controls.left = false;
+            controls.right = false;
+        } else {
+            controls.left = normalizedX < 0;
+            controls.right = normalizedX > 0;
+        }
+        
+        // Update joystick position for manual tilt mode
+        joystickPosition.x = x;
+        joystickPosition.y = y;
+        isJoystickActive = true;
     }
+    
+    function handleJoystickEnd(e) {
+        if (e) e.preventDefault();
+        isDragging = false;
+        
+        // Reset joystick thumb position
+        joystickThumb.style.transform = 'translate(-50%, -50%)';
+        
+        // Reset steering controls
+        controls.left = false;
+        controls.right = false;
+        
+        // Re-enable device orientation steering
+        setTimeout(() => {
+            useDeviceOrientation = true;
+        }, 100);
+        
+        // Reset joystick position for manual tilt mode
+        joystickPosition.x = 0;
+        joystickPosition.y = 0;
+        isJoystickActive = false;
+    }
+    
+    // Add touch prevention to stop browser behaviors that interfere with the game
+    document.addEventListener('touchmove', function(e) {
+        if (gameStarted) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+    
+    // Prevent zooming
+    document.addEventListener('gesturestart', function(e) {
+        if (gameStarted) {
+            e.preventDefault();
+        }
+    });
+    
+    // Add a notification about the controls
+    const notification = document.getElementById('notifications');
+    const mobileControlsMsg = document.createElement('div');
+    mobileControlsMsg.className = 'notification';
+    mobileControlsMsg.style.animation = 'none';
+    mobileControlsMsg.style.opacity = '1';
+    mobileControlsMsg.innerHTML = 'Mobile controls: Use joystick to steer and buttons to accelerate/brake. Tilt device for alternative steering.';
+    notification.appendChild(mobileControlsMsg);
+    
+    // Remove the message after 10 seconds
+    setTimeout(() => {
+        mobileControlsMsg.style.animation = 'fadeOut 2s forwards';
+        setTimeout(() => {
+            notification.removeChild(mobileControlsMsg);
+        }, 2000);
+    }, 10000);
 }
 
 // Game state variables
@@ -1239,86 +1150,42 @@ function animate() {
         chassisBody.applyForce(worldDirection.scale(speed * 3), chassisBody.position); // Less power for reverse
     }
 
-    // Apply extreme tilting effects - based on joystick or device orientation
-    // This enhances the arcade feel with dramatic tilts
     if (controls.left) {
-        // Add dramatic leaning effect when turning left at speed
-        if (currentVelocity > 2) { // Lower velocity threshold for more responsive tilting
-            // Apply direct torque for more immediate tilt response
-            chassisBody.torque.vadd(new CANNON.Vec3(0, 0, currentVelocity * 50), chassisBody.torque);
-            
-            // Create a force that pushes the ATV to lean into the turn - applied high on chassis for leverage
-            const leanDirection = new CANNON.Vec3(-1, 0.5, 0); // Left lean with upward component for leverage
+        // Add leaning effect when turning left at speed
+        if (currentVelocity > 5) {
+            // Create a force that pushes the ATV to lean into the turn
+            const leanDirection = new CANNON.Vec3(-1, 0, 0); // Left lean
             const worldLeanDir = chassisBody.quaternion.vmult(leanDirection);
+            worldLeanDir.y = 0;
             worldLeanDir.normalize();
-            
-            // Apply lean force - much stronger than before
-            const leanFactor = Math.min(currentVelocity * 50, 2000); // 100x stronger lean effect with higher cap
-            // Apply force higher on chassis (0.5 units above center) for more leverage
-            const forcePoint = new CANNON.Vec3();
-            forcePoint.copy(chassisBody.position);
-            forcePoint.y += 0.5;
-            
-            chassisBody.applyForce(worldLeanDir.scale(leanFactor), forcePoint);
+            // Apply lean force - stronger at higher speeds
+            const leanFactor = Math.min(currentVelocity * 25, 500);
+            chassisBody.applyForce(worldLeanDir.scale(leanFactor), chassisBody.position);
         }
-        
-        // Apply steering
         chassisBody.angularVelocity.y = turnSpeed;
     } else if (controls.right) {
-        // Add dramatic leaning effect when turning right at speed
-        if (currentVelocity > 2) {
-            // Apply direct torque for more immediate tilt response
-            chassisBody.torque.vadd(new CANNON.Vec3(0, 0, -currentVelocity * 50), chassisBody.torque);
-            
-            // Create a force that pushes the ATV to lean into the turn - applied high on chassis for leverage
-            const leanDirection = new CANNON.Vec3(1, 0.5, 0); // Right lean with upward component for leverage
+        // Add leaning effect when turning right at speed
+        if (currentVelocity > 5) {
+            // Create a force that pushes the ATV to lean into the turn
+            const leanDirection = new CANNON.Vec3(1, 0, 0); // Right lean
             const worldLeanDir = chassisBody.quaternion.vmult(leanDirection);
+            worldLeanDir.y = 0;
             worldLeanDir.normalize();
-            
-            // Apply lean force - much stronger than before
-            const leanFactor = Math.min(currentVelocity * 50, 2000); // 100x stronger lean effect with higher cap
-            // Apply force higher on chassis (0.5 units above center) for more leverage
-            const forcePoint = new CANNON.Vec3();
-            forcePoint.copy(chassisBody.position);
-            forcePoint.y += 0.5;
-            
-            chassisBody.applyForce(worldLeanDir.scale(leanFactor), forcePoint);
+            // Apply lean force - stronger at higher speeds
+            const leanFactor = Math.min(currentVelocity * 0.5, 500);
+            chassisBody.applyForce(worldLeanDir.scale(leanFactor), chassisBody.position);
         }
-        
-        // Apply steering
         chassisBody.angularVelocity.y = -turnSpeed;
     } else {
-        // Apply additional dampening to quickly return to upright position when not turning
         chassisBody.angularVelocity.y *= 0.9;
-    }
-    
-    // Apply manual tilt effect if active (from joystick in manual tilt mode)
-    if (manualTiltValue !== 0 && isJoystickActive) {
-        const tiltForce = manualTiltValue * 800; // Scale for dramatic effect
-        // Apply at raised point for more leverage
-        const forcePoint = new CANNON.Vec3();
-        forcePoint.copy(chassisBody.position);
-        forcePoint.y += 0.5;
-        
-        // Create a force in the direction of tilt
-        const leanDirection = new CANNON.Vec3(manualTiltValue, 0.5, 0);
-        const worldLeanDir = chassisBody.quaternion.vmult(leanDirection);
-        worldLeanDir.normalize();
-        
-        // Apply force for lean effect
-        chassisBody.applyForce(worldLeanDir.scale(tiltForce), forcePoint);
-        
-        // Also apply direct torque for more immediate response
-        chassisBody.torque.vadd(new CANNON.Vec3(0, 0, -manualTiltValue * 50), chassisBody.torque);
     }
 
     if (chassisBody.position.y <= 0.9 && !settled) {
         settled = true;
         chassisBody.linearDamping = 0.5;
-        // Set angular damping to nearly zero for maximum tilting with minimal resistance
-        chassisBody.angularDamping = 0.01;
+        chassisBody.angularDamping = 0.5;
     }
-    
+
     const maxAngular = 5;
     chassisBody.angularVelocity.x = Math.max(-maxAngular, Math.min(maxAngular, chassisBody.angularVelocity.x));
     chassisBody.angularVelocity.y = Math.max(-maxAngular, Math.min(maxAngular, chassisBody.angularVelocity.y));
