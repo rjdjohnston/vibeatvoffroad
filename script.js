@@ -90,6 +90,15 @@ function setupGameStart() {
             // Hide keyboard controls info on mobile
             controlsInfo.classList.add('hidden');
             setupTouchControls();
+            
+            // Reset ATV position for mobile specifically to ensure proper spawning
+            if (chassisBody) {
+                // Set higher initial position for mobile to ensure it's above the ground
+                chassisBody.position.set(20, 20, 20);
+                chassisBody.velocity.set(0, 0, 0);
+                chassisBody.angularVelocity.set(0, 0, 0);
+                chassisBody.quaternion.set(0, 0, 0, 1);
+            }
         }
         
         // Set game as started
@@ -379,7 +388,8 @@ gltfLoader.load(
         
         // Adjust ATV starting position to match the new track
         if (chassisBody) {
-            chassisBody.position.set(20, 10, 20); // Increased height for safety
+            const spawnHeight = window.isMobileDevice ? 20 : 10;
+            chassisBody.position.set(20, spawnHeight, 20);
             chassisBody.velocity.set(0, 0, 0);
             chassisBody.angularVelocity.set(0, 0, 0);
             chassisBody.quaternion.set(0, 0, 0, 1);
