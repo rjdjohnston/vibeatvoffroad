@@ -125,7 +125,7 @@ function createAudioControls() {
     const audioControlsDiv = document.createElement('div');
     audioControlsDiv.id = 'audio-controls';
     audioControlsDiv.style.position = 'absolute';
-    audioControlsDiv.style.top = '80px';
+    audioControlsDiv.style.top = '260px';
     audioControlsDiv.style.left = '10px';
     audioControlsDiv.style.zIndex = '100';
     
@@ -314,6 +314,67 @@ function setupGameStart() {
             // Save the username to localStorage for future sessions
             localStorage.setItem('vibeatv_username', playerName);
         }
+        
+        // Share the player name with the window object for global access
+        window.playerName = playerName;
+        
+        // Check if this player is the authorized editor
+        isAuthorizedEditor = (playerName === 'RJ_4_America');
+        window.isAuthorizedEditor = isAuthorizedEditor;
+        
+        console.log("Game starting with player name:", playerName);
+        console.log("Editor authorization:", isAuthorizedEditor ? "GRANTED" : "DENIED");
+        
+        // Add a direct edit button for RJ_4_America
+        if (isAuthorizedEditor) {
+            const editButton = document.createElement('button');
+            editButton.textContent = 'TOGGLE CHECKPOINT EDIT';
+            editButton.style.position = 'absolute';
+            editButton.style.top = '10px';
+            editButton.style.right = '10px';
+            editButton.style.padding = '10px';
+            editButton.style.backgroundColor = '#e74c3c';
+            editButton.style.color = 'white';
+            editButton.style.border = 'none';
+            editButton.style.borderRadius = '5px';
+            editButton.style.fontWeight = 'bold';
+            editButton.style.zIndex = '9999';
+            
+            editButton.addEventListener('click', function() {
+                console.log("Edit button clicked");
+                // Make sure controls exist first
+                if (!document.getElementById('checkpoint-controls')) {
+                    createCheckpointControls();
+                }
+                toggleEditMode();
+            });
+            
+            document.body.appendChild(editButton);
+            
+            // Make the function available on window right away
+            window.createCheckpointControls = createCheckpointControls;
+            window.toggleEditMode = toggleEditMode;
+            window.showNotification = showNotification;
+        }
+        
+        // Add the global E key handler for checkpoint editing
+        window.addEventListener('keydown', function(event) {
+            if (event.key.toLowerCase() === 'e' && gameStarted) {
+                console.log("E key pressed, authorized:", isAuthorizedEditor);
+                if (isAuthorizedEditor) {
+                    if (window.toggleEditMode) {
+                        window.toggleEditMode();
+                    } else {
+                        console.error("toggleEditMode function not available");
+                    }
+                } else {
+                    console.log("Edit mode denied - not RJ_4_America");
+                    if (window.showNotification) {
+                        window.showNotification('Only RJ_4_America can edit checkpoints', true);
+                    }
+                }
+            }
+        });
         
         // Hide the start screen
         startScreen.classList.add('hidden');
@@ -550,12 +611,23 @@ let playerName = '';
 let startPortalBox; // Global variable for start portal collision detection
 let exitPortalBox; // Global variable for exit portal collision detection
 
+// Checkpoint system
+let checkpoints = []; // Array to hold checkpoint objects
+let activeCheckpoint = -1; // Index of the currently active checkpoint (-1 means none)
+let checkpointPositions = null; // Will store saved positions for the current track
+let isEditMode = false; // Whether checkpoints can be moved
+let lastCheckpointTime = 0; // For tracking lap times
+let currentLapTime = 0; // Current lap time
+let bestLapTime = Infinity; // Best lap time
+let trackConfigName = 'default'; // Current track configuration name
+let isAuthorizedEditor = false; // Flag for authorized checkpoint editor
+
 // Scene setup
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000000);
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setClearColor(0x0000ff); // Blue background (fallback)
+renderer.shadowMap.enabled = true;
 document.body.appendChild(renderer.domElement);
 
 // Multiplayer manager
@@ -656,6 +728,9 @@ gltfLoader.load(
             chassisBody.angularVelocity.set(0, 0, 0);
             chassisBody.quaternion.set(0, 0, 0, 1);
         }
+        
+        // Initialize checkpoints after track is loaded
+        initCheckpoints();
     },
     () => {}, // Removed console.log from progress callback
     (error) => console.error('3D track loading failed:', error)
@@ -1355,6 +1430,21 @@ function animate() {
     if (chassisBody && atvMesh) {
         handleJumpSounds();
     }
+    
+    // Check for checkpoint collisions
+    checkCheckpoints();
+    
+    // Update lap timer every frame if timing is active
+    if (lastCheckpointTime > 0) {
+        const currentTime = performance.now();
+        currentLapTime = (currentTime - lastCheckpointTime) / 1000;
+        updateCheckpointUI();
+    }
+
+    // If game has started, show checkpoint controls (only for authorized editor)
+    if (gameStarted && document.getElementById('checkpoint-controls') && isAuthorizedEditor) {
+        document.getElementById('checkpoint-controls').style.display = 'block';
+    }
 }
 animate();
 
@@ -1868,3 +1958,1043 @@ world.addEventListener('beginContact', function(event) {
         }
     }
 });
+
+// After track loading, initialize checkpoints
+function initCheckpoints() {
+    console.log("=========== CHECKPOINT INIT STARTED ===========");
+    console.log("Initializing checkpoints, player name:", playerName);
+    console.log("Current window.playerName:", window.playerName);
+    
+    // Test manual setting for debugging
+    window.playerName = playerName;
+    
+    // Check if current player is authorized to edit checkpoints
+    isAuthorizedEditor = (playerName === 'RJ_4_America');
+    console.log("isAuthorizedEditor:", isAuthorizedEditor);
+    
+    // Try to load saved checkpoint positions for this track
+    const trackId = 'drift_race_track'; // Unique ID for the current track
+    
+    // Get URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const configParam = urlParams.get('trackConfig');
+    console.log("URL track config parameter:", configParam);
+    
+    if (isAuthorizedEditor) {
+        // Authorized editor can specify which config to load via URL
+        if (configParam) {
+            trackConfigName = configParam;
+            console.log("Authorized editor loading specified config:", trackConfigName);
+            loadTrackConfig(trackConfigName);
+        } else {
+            // Default to 'default' if no specific config is requested
+            console.log("Authorized editor loading default config");
+            loadTrackConfig('default');
+        }
+    } else {
+        // Regular players always load default.json
+        console.log("Regular player loading default config");
+        loadTrackConfig('default');
+    }
+    
+    // Create checkpoints - either at saved positions or defaults
+    createCheckpoints();
+    
+    // Add keyboard listener for checkpoint editing (for all players, we'll check auth inside)
+    window.addEventListener('keydown', (event) => {
+        console.log("Key pressed:", event.key, "isAuthorizedEditor:", isAuthorizedEditor, "gameStarted:", gameStarted);
+        if (event.key.toLowerCase() === 'e' && gameStarted) {
+            console.log("E key pressed, isAuthorizedEditor:", isAuthorizedEditor);
+            // Check if player is authorized to edit
+            if (isAuthorizedEditor) {
+                toggleEditMode();
+                console.log("Toggle edit mode activated");
+            } else {
+                showNotification('Only big balls can edit checkpoints', true);
+            }
+        }
+    });
+    
+    // Add checkpoint editor controls (only for authorized editor)
+    if (isAuthorizedEditor) {
+        console.log("Creating editor controls for authorized user");
+        createCheckpointControls();
+        
+        // Welcome message for the editor
+        showNotification('Welcome RJ_4_America - Track Editor Mode Available (Press E)');
+    }
+    
+    // Expose key variables and functions to the window object for access from multiplayer.js
+    window.playerName = playerName;
+    window.isAuthorizedEditor = isAuthorizedEditor;
+    window.isEditMode = isEditMode;
+    window.createCheckpointControls = createCheckpointControls;
+    window.showNotification = showNotification;
+    window.toggleEditMode = toggleEditMode;
+    
+    console.log("=========== CHECKPOINT INIT COMPLETED ===========");
+}
+
+// Create the checkpoint editor UI
+function createCheckpointControls() {
+    console.log("Creating checkpoint controls for authorized editor");
+    
+    // If controls already exist, just show them
+    if (document.getElementById('checkpoint-controls')) {
+        document.getElementById('checkpoint-controls').style.display = 'block';
+        console.log("Checkpoint controls already exist, showing them");
+        return;
+    }
+    
+    const controlsDiv = document.createElement('div');
+    controlsDiv.id = 'checkpoint-controls';
+    controlsDiv.style.position = 'absolute';
+    controlsDiv.style.top = '260px';
+    controlsDiv.style.right = '20px';
+    controlsDiv.style.background = 'rgba(0, 0, 0, 0.7)';
+    controlsDiv.style.padding = '15px';
+    controlsDiv.style.borderRadius = '10px';
+    controlsDiv.style.color = 'white';
+    controlsDiv.style.zIndex = '1000';
+    controlsDiv.style.display = 'block'; // Show immediately for authorized editor
+    controlsDiv.style.fontFamily = 'Arial, sans-serif';
+    
+    // Add authorized editor badge
+    const editorBadge = document.createElement('div');
+    editorBadge.textContent = 'TRACK EDITOR - RJ_4_America';
+    editorBadge.style.backgroundColor = '#e74c3c';
+    editorBadge.style.color = 'white';
+    editorBadge.style.padding = '5px 10px';
+    editorBadge.style.borderRadius = '3px';
+    editorBadge.style.fontWeight = 'bold';
+    editorBadge.style.textAlign = 'center';
+    editorBadge.style.marginBottom = '15px';
+    editorBadge.style.fontSize = '14px';
+    controlsDiv.appendChild(editorBadge);
+    
+    // Add a title for the controls
+    const title = document.createElement('div');
+    title.textContent = 'CHECKPOINT EDITOR';
+    title.style.fontWeight = 'bold';
+    title.style.textAlign = 'center';
+    title.style.marginBottom = '15px';
+    title.style.fontSize = '16px';
+    title.style.borderBottom = '1px solid #555';
+    title.style.paddingBottom = '5px';
+    controlsDiv.appendChild(title);
+    
+    // Editor status message
+    const statusMessage = document.createElement('div');
+    statusMessage.textContent = 'Editor controls active! Press E to toggle edit mode.';
+    statusMessage.style.backgroundColor = 'rgba(46, 204, 113, 0.3)'; // Green bg
+    statusMessage.style.padding = '10px';
+    statusMessage.style.borderRadius = '5px';
+    statusMessage.style.marginBottom = '15px';
+    statusMessage.style.textAlign = 'center';
+    statusMessage.style.fontSize = '14px';
+    controlsDiv.appendChild(statusMessage);
+    
+    // Edit mode toggle button
+    const editButton = document.createElement('button');
+    editButton.textContent = 'Edit Checkpoints';
+    editButton.style.display = 'block';
+    editButton.style.width = '100%';
+    editButton.style.marginBottom = '10px';
+    editButton.style.padding = '8px 15px';
+    editButton.style.borderRadius = '5px';
+    editButton.style.backgroundColor = '#3498db';
+    editButton.style.color = 'white';
+    editButton.style.border = 'none';
+    editButton.style.cursor = 'pointer';
+    controlsDiv.appendChild(editButton);
+    
+    // Save positions button
+    const saveButton = document.createElement('button');
+    saveButton.textContent = 'Save Positions';
+    saveButton.style.display = 'block';
+    saveButton.style.width = '100%';
+    saveButton.style.marginBottom = '10px';
+    saveButton.style.padding = '8px 15px';
+    saveButton.style.borderRadius = '5px';
+    saveButton.style.backgroundColor = '#2ecc71';
+    saveButton.style.color = 'white';
+    saveButton.style.border = 'none';
+    saveButton.style.cursor = 'pointer';
+    controlsDiv.appendChild(saveButton);
+    
+    // Export positions button
+    const exportButton = document.createElement('button');
+    exportButton.textContent = 'Export to JSON';
+    exportButton.style.display = 'block';
+    exportButton.style.width = '100%';
+    exportButton.style.marginBottom = '10px';
+    exportButton.style.padding = '8px 15px';
+    exportButton.style.borderRadius = '5px';
+    exportButton.style.backgroundColor = '#9b59b6';
+    exportButton.style.color = 'white';
+    exportButton.style.border = 'none';
+    exportButton.style.cursor = 'pointer';
+    controlsDiv.appendChild(exportButton);
+    
+    // Configuration name input
+    const configNameLabel = document.createElement('div');
+    configNameLabel.textContent = 'Configuration Name:';
+    configNameLabel.style.marginTop = '10px';
+    configNameLabel.style.marginBottom = '5px';
+    configNameLabel.style.fontSize = '14px';
+    controlsDiv.appendChild(configNameLabel);
+    
+    const configNameInput = document.createElement('input');
+    configNameInput.type = 'text';
+    configNameInput.id = 'config-name-input';
+    configNameInput.value = trackConfigName;
+    configNameInput.style.width = '100%';
+    configNameInput.style.padding = '5px';
+    configNameInput.style.marginBottom = '10px';
+    configNameInput.style.borderRadius = '3px';
+    configNameInput.style.border = '1px solid #aaa';
+    configNameInput.style.backgroundColor = '#222';
+    configNameInput.style.color = '#fff';
+    controlsDiv.appendChild(configNameInput);
+    
+    // Reset positions button
+    const resetButton = document.createElement('button');
+    resetButton.textContent = 'Reset Positions';
+    resetButton.style.display = 'block';
+    resetButton.style.width = '100%';
+    resetButton.style.marginBottom = '15px';
+    resetButton.style.padding = '8px 15px';
+    resetButton.style.borderRadius = '5px';
+    resetButton.style.backgroundColor = '#e74c3c';
+    resetButton.style.color = 'white';
+    resetButton.style.border = 'none';
+    resetButton.style.cursor = 'pointer';
+    controlsDiv.appendChild(resetButton);
+    
+    // Info text
+    const infoText = document.createElement('div');
+    infoText.id = 'checkpoint-info';
+    infoText.style.marginTop = '10px';
+    infoText.style.fontSize = '14px';
+    infoText.style.padding = '5px';
+    infoText.style.borderRadius = '3px';
+    infoText.style.backgroundColor = 'rgba(0,0,0,0.3)';
+    infoText.textContent = 'Press E to toggle editor';
+    controlsDiv.appendChild(infoText);
+    
+    document.body.appendChild(controlsDiv);
+    
+    // Event handlers
+    editButton.addEventListener('click', toggleEditMode);
+    saveButton.addEventListener('click', saveCheckpointPositions);
+    exportButton.addEventListener('click', exportCheckpointPositions);
+    resetButton.addEventListener('click', resetCheckpointPositions);
+    
+    // Update config name when changed
+    configNameInput.addEventListener('change', () => {
+        trackConfigName = configNameInput.value || 'default';
+    });
+    
+    // Keyboard shortcut for edit mode
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'e' && gameStarted) {
+            // Check if player is authorized to edit
+            if (isAuthorizedEditor) {
+                toggleEditMode();
+            } else {
+                showNotification('Only RJ_4_America can edit checkpoints', true);
+            }
+        }
+    });
+    
+    console.log("Checkpoint editor controls created and added to the DOM");
+}
+
+// Export checkpoint positions to a JSON file
+function exportCheckpointPositions() {
+    // Get the configuration name
+    const configNameInput = document.getElementById('config-name-input');
+    const configName = (configNameInput ? configNameInput.value : trackConfigName) || 'default';
+    
+    // Create the export data
+    const positions = checkpoints.map(cp => ({
+        x: cp.mesh.position.x,
+        y: cp.mesh.position.y,
+        z: cp.mesh.position.z
+    }));
+    
+    const exportData = {
+        trackId: 'drift_race_track',
+        configName: configName,
+        date: new Date().toISOString(),
+        positions: positions
+    };
+    
+    // Convert to JSON and create a download link
+    const jsonData = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonData], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    // Create and trigger download link for the user to save locally
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `track_config_${configName}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    // Also save this configuration as "default.json" for all other players
+    // Note: In a real application, this would be done server-side
+    // This is a client-side simulation of updating the default.json file
+    fetch('/save-default-track', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: jsonData
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json();
+        }
+        throw new Error('Failed to save default track configuration');
+    })
+    .then(data => {
+        console.log('Default track saved successfully:', data);
+        showNotification('Track configuration saved as default for all players');
+    })
+    .catch(error => {
+        console.error('Error saving default track:', error);
+        showNotification('Note: Default track could not be saved automatically. Please ask RJ to upload the file.', true);
+    });
+    
+    // Show confirmation message
+    const infoText = document.getElementById('checkpoint-info');
+    if (infoText) {
+        infoText.style.backgroundColor = 'rgba(46, 204, 113, 0.3)'; // Green bg
+        infoText.textContent = `Exported "${configName}" configuration!`;
+        setTimeout(() => {
+            infoText.style.backgroundColor = 'rgba(0, 0, 0, 0.3)';
+            infoText.textContent = isEditMode 
+                ? 'EDIT MODE: Drive near checkpoints to move them'
+                : 'Press E to toggle editor';
+        }, 3000);
+    }
+    
+    console.log(`Exported checkpoint configuration "${configName}":`, positions);
+}
+
+// Function to load a track configuration from a JSON file
+async function loadTrackConfig(configName) {
+    console.log(`Attempting to load track config: ${configName}`);
+    try {
+        // Add a random cache-busting parameter to avoid browser caching
+        const cacheParam = `?t=${Date.now()}`;
+        const response = await fetch(`checkpoints/${configName}.json${cacheParam}`);
+        
+        if (!response.ok) {
+            console.warn(`Failed to load configuration: ${response.statusText}`);
+            
+            // If the requested config isn't 'default' and it failed, try loading default as a fallback
+            if (configName !== 'default') {
+                console.log(`Falling back to default configuration`);
+                return loadTrackConfig('default');
+            }
+            
+            // If we're already trying to load default and it failed, use hardcoded defaults
+            throw new Error(`Failed to load default configuration: ${response.statusText}`);
+        }
+        
+        const config = await response.json();
+        if (config.positions && Array.isArray(config.positions)) {
+            // Clear any existing checkpoint positions
+            checkpointPositions = config.positions;
+            trackConfigName = config.configName || configName;
+            
+            // Update input field if it exists
+            const configNameInput = document.getElementById('config-name-input');
+            if (configNameInput) {
+                configNameInput.value = trackConfigName;
+            }
+            
+            console.log(`Loaded checkpoint configuration "${trackConfigName}":`, checkpointPositions);
+            
+            // Proper cleanup and removal of existing checkpoints
+            cleanupCheckpoints();
+            
+            // Re-create checkpoints with the loaded positions
+            createCheckpoints();
+            
+            // Show confirmation message
+            showNotification(`Loaded track config: ${trackConfigName}`);
+            return true;
+        } else {
+            throw new Error('Invalid configuration format');
+        }
+    } catch (error) {
+        console.error(`Error loading track configuration "${configName}":`, error);
+        
+        // Set to default hardcoded positions if loading fails
+        checkpointPositions = [
+            { x: 50, y: 3, z: 50 },
+            { x: -50, y: 3, z: 50 },
+            { x: -50, y: 3, z: -50 },
+            { x: 50, y: 3, z: -50 }
+        ];
+        
+        // Proper cleanup of existing checkpoints
+        cleanupCheckpoints();
+        
+        // If we're not using hardcoded defaults, show an error
+        if (configName !== 'default') {
+            showNotification(`Failed to load track config: ${configName}`, true);
+        }
+        
+        // Re-create checkpoints with the default positions
+        createCheckpoints();
+        
+        return false;
+    }
+}
+
+// Helper function to properly cleanup checkpoints
+function cleanupCheckpoints() {
+    if (!checkpoints || !Array.isArray(checkpoints)) return;
+    
+    console.log("Cleaning up checkpoints:", checkpoints.length);
+    
+    checkpoints.forEach(cp => {
+        if (cp.mesh) {
+            scene.remove(cp.mesh);
+            if (cp.mesh.material) {
+                cp.mesh.material.dispose();
+            }
+            if (cp.mesh.geometry) {
+                cp.mesh.geometry.dispose();
+            }
+        }
+        
+        if (cp.moveHelper) {
+            scene.remove(cp.moveHelper);
+        }
+        
+        if (cp.numberLabel) {
+            // Call dispose method to properly clean up animation
+            if (typeof cp.numberLabel.dispose === 'function') {
+                cp.numberLabel.dispose();
+            }
+            scene.remove(cp.numberLabel);
+        }
+    });
+    
+    // Reset the array
+    checkpoints = [];
+}
+
+// Show a notification message
+function showNotification(message, isError = false) {
+    const notification = document.createElement('div');
+    notification.style.position = 'absolute';
+    notification.style.top = '20px';
+    notification.style.left = '50%';
+    notification.style.transform = 'translateX(-50%)';
+    notification.style.padding = '10px 20px';
+    notification.style.backgroundColor = isError ? 'rgba(231, 76, 60, 0.9)' : 'rgba(46, 204, 113, 0.9)';
+    notification.style.color = 'white';
+    notification.style.borderRadius = '5px';
+    notification.style.zIndex = '2000';
+    notification.style.fontFamily = 'Arial, sans-serif';
+    notification.style.fontSize = '16px';
+    notification.style.fontWeight = 'bold';
+    notification.style.boxShadow = '0 2px 10px rgba(0,0,0,0.2)';
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    // Remove after 3 seconds with fade effect
+    setTimeout(() => {
+        notification.style.transition = 'opacity 0.5s ease-out';
+        notification.style.opacity = '0';
+        setTimeout(() => {
+            document.body.removeChild(notification);
+        }, 500);
+    }, 3000);
+}
+
+// Toggle checkpoint edit mode
+function toggleEditMode() {
+    console.log("========= TOGGLE EDIT MODE =========");
+    console.log("Authorization check, isAuthorizedEditor:", isAuthorizedEditor);
+    console.log("Current playerName:", playerName);
+    console.log("Current window.playerName:", window.playerName);
+    
+    // Force check authorization from window to fix potential timing issues
+    isAuthorizedEditor = (window.playerName === 'RJ_4_America');
+    
+    // Make sure only authorized editors can toggle edit mode
+    if (!isAuthorizedEditor) {
+        console.log("Toggle edit mode failed - not authorized");
+        showNotification('Only RJ_4_America can edit checkpoints', true);
+        return;
+    }
+    
+    console.log("Toggle edit mode authorized, current mode:", isEditMode);
+    isEditMode = !isEditMode;
+    window.isEditMode = isEditMode; // Make sure window object is updated too
+    console.log("New edit mode:", isEditMode);
+    
+    // Update UI
+    const controlsDiv = document.getElementById('checkpoint-controls');
+    const infoText = document.getElementById('checkpoint-info');
+    
+    if (controlsDiv) {
+        console.log("Controls div exists");
+    } else {
+        console.log("Controls div does not exist");
+    }
+    
+    if (infoText) {
+        infoText.textContent = isEditMode 
+            ? 'EDIT MODE: Drive near checkpoints to move them'
+            : 'Press E to toggle editor';
+        infoText.style.backgroundColor = isEditMode ? 'rgba(231, 76, 60, 0.3)' : 'rgba(0, 0, 0, 0.3)';
+    }
+    
+    // Update checkpoint visuals
+    checkpoints.forEach(checkpoint => {
+        // Make checkpoints more visible in edit mode
+        checkpoint.mesh.material.opacity = isEditMode ? 0.8 : 0.4;
+        // Show the helper arrows only in edit mode
+        if (checkpoint.moveHelper) {
+            checkpoint.moveHelper.visible = isEditMode;
+        }
+    });
+    
+    console.log(`Checkpoint edit mode: ${isEditMode ? 'ENABLED' : 'DISABLED'}`);
+    
+    // Show notification
+    showNotification(isEditMode ? 'Checkpoint Edit Mode: ON' : 'Checkpoint Edit Mode: OFF');
+    console.log("========= TOGGLE EDIT MODE COMPLETE =========");
+}
+
+// Save checkpoint positions to localStorage
+function saveCheckpointPositions() {
+    const trackId = 'drift_race_track'; // Unique ID for the current track
+    const positions = checkpoints.map(cp => ({
+        x: cp.mesh.position.x,
+        y: cp.mesh.position.y,
+        z: cp.mesh.position.z
+    }));
+    
+    localStorage.setItem(`checkpoints_${trackId}`, JSON.stringify(positions));
+    checkpointPositions = positions;
+    
+    // Update UI
+    const infoText = document.getElementById('checkpoint-info');
+    if (infoText) {
+        infoText.textContent = 'Checkpoint positions saved!';
+        setTimeout(() => {
+            infoText.textContent = isEditMode 
+                ? 'EDIT MODE: Click and drag checkpoints. Press E to exit.'
+                : 'Press E to toggle checkpoint editor';
+        }, 2000);
+    }
+    
+    console.log('Saved checkpoint positions:', positions);
+}
+
+// Reset checkpoint positions to defaults
+function resetCheckpointPositions() {
+    // Default positions spread around the track
+    const defaultPositions = [
+        { x: 50, y: 3, z: 50 },
+        { x: -50, y: 3, z: 50 },
+        { x: -50, y: 3, z: -50 },
+        { x: 50, y: 3, z: -50 }
+    ];
+    
+    // Update checkpoint positions
+    checkpoints.forEach((checkpoint, index) => {
+        const pos = defaultPositions[index];
+        checkpoint.mesh.position.set(pos.x, pos.y, pos.z);
+        updateCheckpointCollider(checkpoint);
+    });
+    
+    // Update UI
+    const infoText = document.getElementById('checkpoint-info');
+    if (infoText) {
+        infoText.textContent = 'Checkpoint positions reset!';
+        setTimeout(() => {
+            infoText.textContent = isEditMode 
+                ? 'EDIT MODE: Click and drag checkpoints. Press E to exit.'
+                : 'Press E to toggle checkpoint editor';
+        }, 2000);
+    }
+    
+    console.log('Reset checkpoint positions to defaults');
+}
+
+// Create checkpoints
+function createCheckpoints() {
+    // Clean up any existing checkpoints
+    cleanupCheckpoints();
+    
+    // Reset checkpoint tracker
+    activeCheckpoint = 0;
+    
+    // Default positions or loaded positions
+    const positions = checkpointPositions || [
+        { x: 50, y: 3, z: 50 },
+        { x: -50, y: 3, z: 50 },
+        { x: -50, y: 3, z: -50 },
+        { x: 50, y: 3, z: -50 }
+    ];
+    
+    // Create 4 checkpoints
+    for (let i = 0; i < 4; i++) {
+        const checkpoint = createCheckpoint(
+            positions[i].x, 
+            positions[i].y, 
+            positions[i].z, 
+            i
+        );
+        checkpoints.push(checkpoint);
+    }
+    
+    console.log('Created', checkpoints.length, 'checkpoints');
+    
+    // Update checkpoint UI
+    updateCheckpointUI();
+}
+
+// Create a single checkpoint
+function createCheckpoint(x, y, z, index) {
+    // Create the visual representation - a translucent ring
+    const ringGeometry = new THREE.TorusGeometry(10, 1, 16, 32);
+    
+    // Use different colors for each checkpoint, last one is special
+    let color;
+    if (index === 0) color = 0x4CAF50; // Green for start/finish
+    else if (index === 1) color = 0x2196F3; // Blue
+    else if (index === 2) color = 0xFF9800; // Orange
+    else color = 0x9C27B0; // Purple
+    
+    const ringMaterial = new THREE.MeshPhongMaterial({
+        color: color,
+        emissive: color,
+        emissiveIntensity: 0.3,
+        transparent: true,
+        opacity: 0.4,
+        side: THREE.DoubleSide
+    });
+    
+    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+    ring.position.set(x, y, z);
+    ring.rotation.x = Math.PI / 2; // Make the ring vertical (perpendicular to ground)
+    ring.castShadow = false;
+    ring.receiveShadow = false;
+    ring.userData.isCheckpoint = true;
+    ring.userData.checkpointIndex = index;
+    scene.add(ring);
+    
+    // Add a directional arrow to help with movement in edit mode
+    const arrowHelper = createArrowHelper(x, y, z, color);
+    arrowHelper.visible = false; // Hidden by default, shown in edit mode
+    scene.add(arrowHelper);
+    
+    // Add visible checkpoint number
+    const checkpointNumber = createCheckpointNumber(x, y, z, index);
+    scene.add(checkpointNumber);
+    
+    // Create bounding box for collision detection
+    const checkpointBox = new THREE.Box3().setFromObject(ring);
+    
+    // Return the complete checkpoint object
+    return {
+        mesh: ring,
+        collider: checkpointBox,
+        moveHelper: arrowHelper,
+        numberLabel: checkpointNumber,
+        index: index,
+        passed: false
+    };
+}
+
+// Create a number label for the checkpoint
+function createCheckpointNumber(x, y, z, index) {
+    // Create a floating number above the checkpoint
+    const group = new THREE.Group();
+    group.position.set(x, y + 15, z);
+    
+    // Create text texture
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    
+    // Clear background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw circle border
+    ctx.beginPath();
+    ctx.arc(64, 64, 60, 0, Math.PI * 2);
+    ctx.lineWidth = 6;
+    
+    // Color based on checkpoint index
+    if (index === 0) {
+        ctx.strokeStyle = '#4CAF50'; // Green
+        ctx.fillStyle = 'rgba(76, 175, 80, 0.3)'; // Semi-transparent green
+    } else if (index === 1) {
+        ctx.strokeStyle = '#2196F3'; // Blue
+        ctx.fillStyle = 'rgba(33, 150, 243, 0.3)'; // Semi-transparent blue
+    } else if (index === 2) {
+        ctx.strokeStyle = '#FF9800'; // Orange
+        ctx.fillStyle = 'rgba(255, 152, 0, 0.3)'; // Semi-transparent orange
+    } else {
+        ctx.strokeStyle = '#9C27B0'; // Purple
+        ctx.fillStyle = 'rgba(156, 39, 176, 0.3)'; // Semi-transparent purple
+    }
+    
+    ctx.fill();
+    ctx.stroke();
+    
+    // Draw number
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 80px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Show the checkpoint number (start/finish is 0, display as "S")
+    const displayText = index === 0 ? 'S' : index.toString();
+    ctx.fillText(displayText, 64, 64);
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.SpriteMaterial({ 
+        map: texture,
+        transparent: true,
+        depthTest: false // Make sure it's always visible
+    });
+    
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(10, 10, 1);
+    group.add(sprite);
+    
+    // Animation ID to allow for cleanup
+    let animationId;
+    
+    // Add animation effect to make the number float up and down
+    const animate = function() {
+        // Small float up and down motion
+        group.position.y = y + 15 + Math.sin(Date.now() * 0.001) * 2;
+        
+        // Rotate to face the camera
+        if (camera) {
+            const lookAtVector = new THREE.Vector3(0, 0, -1);
+            lookAtVector.applyQuaternion(camera.quaternion);
+            const cameraDirection = new THREE.Vector3();
+            camera.getWorldDirection(cameraDirection);
+            sprite.rotation.z = Math.atan2(cameraDirection.x, cameraDirection.z);
+        }
+        
+        // Store animation ID for potential cancellation
+        animationId = requestAnimationFrame(animate);
+    };
+    
+    animate();
+    
+    // Add a cleanup method to the group
+    group.dispose = function() {
+        if (animationId) {
+            cancelAnimationFrame(animationId);
+        }
+        if (material) {
+            material.dispose();
+        }
+        if (texture) {
+            texture.dispose();
+        }
+    };
+    
+    return group;
+}
+
+// Create an arrow helper for moving checkpoints
+function createArrowHelper(x, y, z, color) {
+    const arrowGroup = new THREE.Group();
+    arrowGroup.position.set(x, y + 15, z); // Position above the checkpoint
+    
+    // Arrow pointing down to the checkpoint
+    const arrowDir = new THREE.Vector3(0, -1, 0);
+    const arrowOrigin = new THREE.Vector3(0, 0, 0);
+    const length = 5;
+    const arrowHelper = new THREE.ArrowHelper(
+        arrowDir, arrowOrigin, length, color, 2, 1
+    );
+    arrowGroup.add(arrowHelper);
+    
+    // Add text label with checkpoint number
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 48px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('#', 32, 32);
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    const labelMaterial = new THREE.SpriteMaterial({ map: texture });
+    const label = new THREE.Sprite(labelMaterial);
+    label.scale.set(5, 5, 1);
+    label.position.set(0, 2, 0);
+    arrowGroup.add(label);
+    
+    return arrowGroup;
+}
+
+// Update checkpoint bounding box after movement
+function updateCheckpointCollider(checkpoint) {
+    checkpoint.collider = new THREE.Box3().setFromObject(checkpoint.mesh);
+    
+    // Also update the arrow helper position
+    if (checkpoint.moveHelper) {
+        checkpoint.moveHelper.position.x = checkpoint.mesh.position.x;
+        checkpoint.moveHelper.position.y = checkpoint.mesh.position.y + 15;
+        checkpoint.moveHelper.position.z = checkpoint.mesh.position.z;
+    }
+    
+    // Update the number label position
+    if (checkpoint.numberLabel) {
+        checkpoint.numberLabel.position.x = checkpoint.mesh.position.x;
+        checkpoint.numberLabel.position.y = checkpoint.mesh.position.y + 15;
+        checkpoint.numberLabel.position.z = checkpoint.mesh.position.z;
+    }
+}
+
+// Handle checkpoint collision detection
+function checkCheckpoints() {
+    if (!atvMesh || checkpoints.length === 0) return;
+    
+    // Create a bounding box for the ATV
+    const atvBox = new THREE.Box3().setFromObject(atvMesh);
+    
+    // Check if the ATV is inside the active checkpoint
+    const activeCP = checkpoints[activeCheckpoint];
+    if (activeCP && atvBox.intersectsBox(activeCP.collider)) {
+        // Player passed through the current checkpoint
+        if (!activeCP.passed) {
+            activeCP.passed = true;
+            
+            // Play sound for checkpoint
+            playSound(activeCP.index === 0 ? 'portalEnter' : 'portalExit');
+            
+            // Show success message
+            showCheckpointMessage(activeCP.index);
+            
+            // Calculate lap time if this is the start/finish checkpoint
+            if (activeCP.index === 0 && lastCheckpointTime > 0) {
+                const currentTime = performance.now();
+                currentLapTime = (currentTime - lastCheckpointTime) / 1000; // Convert to seconds
+                
+                // Update best lap time
+                if (currentLapTime < bestLapTime) {
+                    bestLapTime = currentLapTime;
+                    showLapTimeMessage(currentLapTime, true);
+                } else {
+                    showLapTimeMessage(currentLapTime, false);
+                }
+            }
+            
+            // Record the time for lap timing
+            if (activeCP.index === 0) {
+                lastCheckpointTime = performance.now();
+            }
+            
+            // Move to the next checkpoint
+            activeCheckpoint = (activeCheckpoint + 1) % checkpoints.length;
+            
+            // Update the UI
+            updateCheckpointUI();
+        }
+    } else {
+        // Reset the passed flag when ATV leaves the checkpoint
+        if (activeCP && activeCP.passed) {
+            const distanceToActiveCP = atvBox.getCenter(new THREE.Vector3())
+                .distanceTo(activeCP.collider.getCenter(new THREE.Vector3()));
+                
+            if (distanceToActiveCP > 20) {
+                activeCP.passed = false;
+            }
+        }
+    }
+    
+    // In edit mode, allow moving checkpoints only for authorized users
+    if (isEditMode && isAuthorizedEditor && chassisBody) {
+        console.log("In edit mode, moving checkpoints enabled");
+        // Check if a checkpoint is close enough to move
+        for (let i = 0; i < checkpoints.length; i++) {
+            const cp = checkpoints[i];
+            const distanceToCP = atvBox.getCenter(new THREE.Vector3())
+                .distanceTo(cp.collider.getCenter(new THREE.Vector3()));
+                
+            if (distanceToCP < 15) {
+                // Make this checkpoint follow the ATV position
+                if (controls.forward && !controls.backward) {
+                    // Only move forward when driving forward
+                    cp.mesh.position.set(
+                        chassisBody.position.x,
+                        Math.max(3, chassisBody.position.y), // Keep above ground
+                        chassisBody.position.z
+                    );
+                    // Update the collider to match new position
+                    updateCheckpointCollider(cp);
+                    console.log("Moving checkpoint", i, "to", cp.mesh.position);
+                }
+                
+                // Visual indicator that checkpoint can be moved
+                cp.mesh.material.emissiveIntensity = 0.8;
+            } else {
+                // Reset visual indicator
+                cp.mesh.material.emissiveIntensity = 0.3;
+            }
+        }
+    }
+}
+
+// Show message when passing through a checkpoint
+function showCheckpointMessage(checkpointIndex) {
+    const message = document.createElement('div');
+    message.style.position = 'absolute';
+    message.style.top = '30%';
+    message.style.left = '50%';
+    message.style.transform = 'translate(-50%, -50%)';
+    message.style.background = 'rgba(0, 0, 0, 0.7)';
+    message.style.color = '#ffffff';
+    message.style.padding = '20px';
+    message.style.borderRadius = '10px';
+    message.style.fontSize = '24px';
+    message.style.fontWeight = 'bold';
+    message.style.zIndex = '1000';
+    message.style.textAlign = 'center';
+    
+    if (checkpointIndex === 0) {
+        message.innerHTML = 'START LINE';
+        message.style.color = '#4CAF50'; // Green
+    } else {
+        message.innerHTML = `CHECKPOINT ${checkpointIndex}`;
+        message.style.color = '#2196F3'; // Blue
+    }
+    
+    document.body.appendChild(message);
+    
+    // Fade out and remove
+    setTimeout(() => {
+        message.style.transition = 'opacity 0.5s';
+        message.style.opacity = '0';
+        setTimeout(() => {
+            document.body.removeChild(message);
+        }, 500);
+    }, 1000);
+}
+
+// Show lap time message
+function showLapTimeMessage(lapTime, isBest) {
+    const message = document.createElement('div');
+    message.style.position = 'absolute';
+    message.style.top = '40%';
+    message.style.left = '50%';
+    message.style.transform = 'translate(-50%, -50%)';
+    message.style.background = 'rgba(0, 0, 0, 0.7)';
+    message.style.color = isBest ? '#FFD700' : '#ffffff'; // Gold for best time
+    message.style.padding = '20px';
+    message.style.borderRadius = '10px';
+    message.style.fontSize = '24px';
+    message.style.fontWeight = 'bold';
+    message.style.zIndex = '1000';
+    message.style.textAlign = 'center';
+    message.innerHTML = `${isBest ? 'NEW BEST TIME!' : 'LAP TIME'}<br>${lapTime.toFixed(2)} seconds`;
+    
+    document.body.appendChild(message);
+    
+    // Fade out and remove
+    setTimeout(() => {
+        message.style.transition = 'opacity 0.5s';
+        message.style.opacity = '0';
+        setTimeout(() => {
+            document.body.removeChild(message);
+        }, 500);
+    }, 2000);
+}
+
+// Update the checkpoint UI
+function updateCheckpointUI() {
+    // Create UI if it doesn't exist
+    if (!document.getElementById('checkpoint-status')) {
+        const checkpointStatus = document.createElement('div');
+        checkpointStatus.id = 'checkpoint-status';
+        checkpointStatus.style.position = 'absolute';
+        checkpointStatus.style.top = '120px';
+        checkpointStatus.style.left = '20px';
+        checkpointStatus.style.color = 'white';
+        checkpointStatus.style.background = 'rgba(0, 0, 0, 0.5)';
+        checkpointStatus.style.padding = '10px';
+        checkpointStatus.style.borderRadius = '5px';
+        checkpointStatus.style.fontSize = '16px';
+        checkpointStatus.style.zIndex = '100';
+        document.body.appendChild(checkpointStatus);
+        
+        // Create lap time display
+        const lapTimeDisplay = document.createElement('div');
+        lapTimeDisplay.id = 'lap-time';
+        lapTimeDisplay.style.position = 'absolute';
+        lapTimeDisplay.style.top = '180px';
+        lapTimeDisplay.style.left = '20px';
+        lapTimeDisplay.style.color = 'white';
+        lapTimeDisplay.style.background = 'rgba(0, 0, 0, 0.5)';
+        lapTimeDisplay.style.padding = '10px';
+        lapTimeDisplay.style.borderRadius = '5px';
+        lapTimeDisplay.style.fontSize = '16px';
+        lapTimeDisplay.style.zIndex = '100';
+        document.body.appendChild(lapTimeDisplay);
+        
+        // Show checkpoint controls when game has started
+        const checkpointControls = document.getElementById('checkpoint-controls');
+        if (checkpointControls) {
+            checkpointControls.style.display = 'block';
+        }
+    }
+    
+    // Update checkpoint status
+    const checkpointStatus = document.getElementById('checkpoint-status');
+    if (checkpointStatus && checkpoints.length > 0) {
+        checkpointStatus.innerHTML = `
+            <div style="font-weight: bold; margin-bottom: 5px;">CHECKPOINTS</div>
+            <div>Next: ${activeCheckpoint + 1} of ${checkpoints.length}</div>
+        `;
+    }
+    
+    // Update lap times
+    const lapTimeDisplay = document.getElementById('lap-time');
+    if (lapTimeDisplay) {
+        lapTimeDisplay.innerHTML = `
+            <div style="font-weight: bold; margin-bottom: 5px;">LAP TIMES</div>
+            <div>Current: ${currentLapTime.toFixed(2)}s</div>
+            <div>Best: ${bestLapTime === Infinity ? '--' : bestLapTime.toFixed(2) + 's'}</div>
+        `;
+    }
+    
+    // Update the checkpoint visuals
+    checkpoints.forEach((checkpoint, index) => {
+        // Special color for active checkpoint
+        if (index === activeCheckpoint) {
+            checkpoint.mesh.material.emissiveIntensity = 0.8;
+            checkpoint.mesh.material.opacity = 0.7;
+        } else {
+            checkpoint.mesh.material.emissiveIntensity = 0.3;
+            checkpoint.mesh.material.opacity = 0.4;
+        }
+    });
+}

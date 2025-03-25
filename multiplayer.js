@@ -208,9 +208,57 @@ class MultiplayerManager {
                 this.players[data.id].name = data.name;
                 this.updatePlayerNameDisplay(data.id);
                 
+                // Update our local playerName if this is our player
+                if (data.id === this.socket.id) {
+                    this.playerName = data.name;
+                    
+                    // Update the global playerName variable in the main script
+                    if (window.playerName !== undefined) {
+                        window.playerName = data.name;
+                        console.log("Updated global playerName to:", data.name);
+                        
+                        // Re-check editor authorization if this player name is changing
+                        if (window.isAuthorizedEditor !== undefined) {
+                            const wasAuthorized = window.isAuthorizedEditor;
+                            window.isAuthorizedEditor = (data.name === 'RJ_4_America');
+                            console.log("Editor authorization updated:", window.isAuthorizedEditor);
+                            
+                            // Handle change from authorized to unauthorized
+                            if (wasAuthorized && !window.isAuthorizedEditor) {
+                                // If edit mode is on, turn it off
+                                if (window.isEditMode) {
+                                    window.isEditMode = false;
+                                    window.showNotification('Edit mode disabled - no longer authorized', true);
+                                    
+                                    // Hide editor controls if they exist
+                                    const controls = document.getElementById('checkpoint-controls');
+                                    if (controls) {
+                                        controls.style.display = 'none';
+                                    }
+                                }
+                            }
+                            
+                            // If now authorized, create controls if needed
+                            if (!wasAuthorized && window.isAuthorizedEditor) {
+                                // If checkpoint controls don't exist yet, create them
+                                if (!document.getElementById('checkpoint-controls') && window.createCheckpointControls) {
+                                    window.createCheckpointControls();
+                                    
+                                    // Welcome message for the editor
+                                    this.showNotification('Welcome RJ_4_America - Track Editor Mode Available (Press E)');
+                                } else if (document.getElementById('checkpoint-controls')) {
+                                    // Show existing controls
+                                    document.getElementById('checkpoint-controls').style.display = 'block';
+                                    this.showNotification('Editor controls activated - Press E to edit');
+                                }
+                            }
+                        }
+                    }
+                }
+                
                 // Show notification if name changed
                 if (oldName !== data.name && oldName !== 'Unknown Player' && oldName !== 'Unknown') {
-                    this.showNotification(`${oldName} changed name to ${data.name}`);
+                    this.showNotification(`${oldName} changed name to: "${data.name}"`);
                 }
                 
                 // Update scoreboard with name change

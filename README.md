@@ -10,6 +10,8 @@ A multiplayer 3D ATV off-road racing game built with Three.js, CANNON.js, and So
 - Customizable player names and colors
 - Stunt ramps and jump tracking
 - Scoreboard and player statistics
+- Racing checkpoint system with lap timing
+- Official track editor only available to RJ_4_America
 
 ## Development Setup
 
@@ -95,6 +97,56 @@ docker compose down && docker compose up -d
 - **D / Right Arrow**: Turn right
 - **Space**: Jump/Boost
 - **R**: Reset position (if stuck)
+- **E**: Toggle checkpoint edit mode (RJ_4_America only)
+
+## Checkpoint System
+
+The game includes a racing checkpoint system with customizable checkpoint positions and lap timing.
+
+### Features
+
+- Race through 4 checkpoints positioned around the track
+- Lap timing with best lap tracking
+- Visual indicators for active checkpoint
+- Special track editor mode for RJ_4_America only
+- Visible checkpoint numbers with color coding:
+  - Start/Finish: Green with "S" label
+  - Checkpoint 1: Blue with "1" label
+  - Checkpoint 2: Orange with "2" label
+  - Checkpoint 3: Purple with "3" label
+
+### Checkpoint Editor (RJ_4_America Only)
+
+The checkpoint editor is restricted to the player named "RJ_4_America". This ensures consistent checkpoint placement for all players.
+
+When playing as RJ_4_America:
+1. Press **E** to toggle checkpoint editor mode
+2. Drive near a checkpoint and move forward to position it
+3. Use the editor panel (bottom right) to save or export positions
+4. JSON configuration files are stored in the `checkpoints/` directory
+
+### Configuration Files
+
+The game loads checkpoint configurations from JSON files in the `checkpoints/` directory:
+
+- `default.json` is used for all regular players
+- Only RJ_4_America can modify checkpoint positions
+
+### JSON Format
+
+```json
+{
+  "trackId": "drift_race_track",
+  "configName": "my_track",
+  "date": "2024-03-25T12:00:00.000Z",
+  "positions": [
+    { "x": 50, "y": 3, "z": 50 },
+    { "x": -50, "y": 3, "z": 50 },
+    { "x": -50, "y": 3, "z": -50 },
+    { "x": 50, "y": 3, "z": -50 }
+  ]
+}
+```
 
 ## Game Physics
 

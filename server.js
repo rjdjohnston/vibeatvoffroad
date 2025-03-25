@@ -1,9 +1,13 @@
+// Server.js - Main server file for multiplayer racing game
+
+// Import required modules
 const express = require('express');
 const http = require('http');
 const https = require('https');
+const socketIO = require('socket.io');
+const path = require('path');
 const fs = require('fs');
 const { Server } = require('socket.io');
-const path = require('path');
 
 // Create express app
 const app = express();
@@ -29,6 +33,9 @@ app.use((req, res, next) => {
   
   next();
 });
+
+// Add JSON body parser middleware
+app.use(express.json({ limit: '1mb' }));
 
 let server;
 
@@ -232,6 +239,43 @@ const PORT = process.env.PORT || 8090;
 server.listen(PORT, '0.0.0.0', () => {
   const protocol = SSL_KEY_PATH && SSL_CERT_PATH ? 'https' : 'http';
   console.log(`Server running on ${protocol}://localhost:${PORT}`);
+});
+
+// Add route for saving checkpoint configurations
+app.post('/save-default-track', (req, res) => {
+  try {
+    // Ensure the configuration is from an authorized user (RJ_4_America)
+    if (!req.body || !req.body.configName) {
+      return res.status(400).json({ success: false, message: 'Invalid configuration data' });
+    }
+    
+    // Save the received configuration as default.json
+    const checkpointsDir = path.join(__dirname, 'checkpoints');
+    
+    // Create the directory if it doesn't exist
+    if (!fs.existsSync(checkpointsDir)) {
+      fs.mkdirSync(checkpointsDir, { recursive: true });
+    }
+    
+    // Write the configuration to default.json
+    fs.writeFileSync(
+      path.join(checkpointsDir, 'default.json'),
+      JSON.stringify(req.body, null, 2)
+    );
+    
+    console.log('Default track configuration saved by authorized user');
+    
+    return res.json({ 
+      success: true, 
+      message: 'Default track configuration saved successfully' 
+    });
+  } catch (error) {
+    console.error('Error saving default track configuration:', error);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Error saving default track configuration' 
+    });
+  }
 });
 
 // Helper function to generate random color for players
