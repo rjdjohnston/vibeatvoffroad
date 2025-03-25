@@ -1132,8 +1132,13 @@ camera.lookAt(0, 0, 0);
 // Animation loop
 let settled = false;
 let clock = new THREE.Clock();
+let isRunning = true; // Initialize isRunning to true so the animation loop runs
+
 function animate() {
     requestAnimationFrame(animate);
+    
+    if (!isRunning) return;
+    
     vibeVerse();
     world.step(1 / 60);
 
@@ -1317,7 +1322,7 @@ function animate() {
         }
     }
 
-    // Ensure controls are not stuck
+    // Prevent controls from getting stuck
     if (!isJoystickActive && !useDeviceOrientation) {
         controls.left = false;
         controls.right = false;
