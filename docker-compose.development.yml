@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: Dockerfile.development
     ports:
-      - "8091:8091"
+      - "8888:8888"
       # When using Cloudflare, you typically don't need this direct HTTPS port
       # as Cloudflare handles the SSL termination
       # - "8443:8443"
@@ -17,7 +17,7 @@ services:
       # - ./certs/server.crt:/app/certs/server.crt
     environment:
       - NODE_ENV=development
-      - PORT=8091
+      - PORT=8888
       # With Flexible SSL, we're telling the server not to look for certificates
       - SSL_KEY_PATH=
       - SSL_CERT_PATH=
@@ -29,5 +29,4 @@ services:
 
 networks:
   app-network:
-    external:
-      name: dggames_app-network
+    driver: bridge

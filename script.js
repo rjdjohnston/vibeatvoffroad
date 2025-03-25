@@ -4,7 +4,245 @@ document.addEventListener('DOMContentLoaded', function() {
     createExitPortal();
     createStartPortal();
     detectMobileDevice();
+    initAudio();
 });
+
+// Audio system
+let audioSystem = {
+    sounds: {},
+    bgMusic: null,
+    engineSound: null,
+    isMuted: false,
+    loaded: false
+};
+
+// Initialize audio system
+function initAudio() {
+    // Initialize sounds object
+    audioSystem.sounds = {};
+    
+    // Create loader function with better error handling
+    const loadAudio = (url, callback) => {
+        try {
+            const audio = new Audio();
+            
+            // Set up event listeners
+            audio.addEventListener('canplaythrough', () => {
+                console.log(`Audio loaded: ${url}`);
+                if (callback) callback(audio);
+            }, { once: true });
+            
+            audio.addEventListener('error', (err) => {
+                console.warn(`Error loading audio file ${url}:`, err);
+                if (callback) callback(null); // Pass null to indicate failure
+            });
+            
+            // Set source and load
+            audio.src = url;
+            audio.load();
+            return audio;
+        } catch (e) {
+            console.error(`Exception creating audio for ${url}:`, e);
+            if (callback) callback(null);
+            return null;
+        }
+    };
+    
+    // Track loading progress
+    let soundsToLoad = 8; // Increased from 6 to 8 for portal sounds
+    let soundsLoaded = 0;
+    
+    const onSoundLoad = (sound) => {
+        soundsLoaded++;
+        console.log(`Sound loaded: ${soundsLoaded}/${soundsToLoad}`);
+        
+        if (soundsLoaded >= soundsToLoad) {
+            audioSystem.loaded = true;
+            console.log('All audio files loaded successfully');
+        }
+    };
+    
+    // Wrap in try-catch to prevent any initialization errors
+    try {
+        // Create audio elements
+        audioSystem.bgMusic = loadAudio('sounds/background-music.mp3', onSoundLoad);
+        if (audioSystem.bgMusic) {
+            audioSystem.bgMusic.loop = true;
+            audioSystem.bgMusic.volume = 0.4;
+        }
+        
+        // Engine sound - loops and adjusts with speed
+        audioSystem.engineSound = loadAudio('sounds/engine-idle.mp3', onSoundLoad);
+        if (audioSystem.engineSound) {
+            audioSystem.engineSound.loop = true;
+            audioSystem.engineSound.volume = 0.2;
+        }
+        
+        // Load other sound effects - initialize object with default volume
+        const soundFiles = {
+            collision: 'sounds/collision.mp3',
+            jump: 'sounds/jump.mp3',
+            land: 'sounds/land.mp3',
+            dirt: 'sounds/dirt.mp3'
+        };
+        
+        // Load each sound effect
+        Object.entries(soundFiles).forEach(([name, url]) => {
+            audioSystem.sounds[name] = loadAudio(url, (sound) => {
+                if (sound) {
+                    sound.volume = 0.3;
+                }
+                onSoundLoad(sound);
+            });
+        });
+        
+        // Portal sounds - reuse existing sounds
+        audioSystem.sounds.portalEnter = loadAudio('sounds/jump.mp3', (sound) => {
+            if (sound) {
+                sound.volume = 0.3;
+            }
+            onSoundLoad(sound);
+        });
+        
+        audioSystem.sounds.portalExit = loadAudio('sounds/land.mp3', (sound) => {
+            if (sound) {
+                sound.volume = 0.3;
+            }
+            onSoundLoad(sound);
+        });
+        
+        // Create audio controls
+        createAudioControls();
+    } catch (e) {
+        console.error('Error initializing audio system:', e);
+    }
+}
+
+// Create audio controls in the UI
+function createAudioControls() {
+    const gameHud = document.getElementById('game-hud');
+    
+    const audioControlsDiv = document.createElement('div');
+    audioControlsDiv.id = 'audio-controls';
+    audioControlsDiv.style.position = 'absolute';
+    audioControlsDiv.style.top = '80px';
+    audioControlsDiv.style.left = '10px';
+    audioControlsDiv.style.zIndex = '100';
+    
+    const toggleButton = document.createElement('button');
+    toggleButton.id = 'toggle-audio';
+    toggleButton.innerHTML = '🔊';
+    toggleButton.style.background = 'rgba(0, 0, 0, 0.6)';
+    toggleButton.style.color = 'white';
+    toggleButton.style.border = '1px solid rgba(0, 160, 255, 0.5)';
+    toggleButton.style.borderRadius = '5px';
+    toggleButton.style.padding = '5px 10px';
+    toggleButton.style.fontSize = '16px';
+    toggleButton.style.cursor = 'pointer';
+    
+    toggleButton.addEventListener('click', toggleAudio);
+    
+    audioControlsDiv.appendChild(toggleButton);
+    gameHud.appendChild(audioControlsDiv);
+}
+
+// Toggle audio mute/unmute
+function toggleAudio() {
+    audioSystem.isMuted = !audioSystem.isMuted;
+    
+    const toggleButton = document.getElementById('toggle-audio');
+    if (toggleButton) {
+        toggleButton.innerHTML = audioSystem.isMuted ? '🔈' : '🔊';
+    }
+    
+    // Mute/unmute all sounds
+    if (audioSystem.bgMusic) {
+        audioSystem.bgMusic.muted = audioSystem.isMuted;
+    }
+    
+    if (audioSystem.engineSound) {
+        audioSystem.engineSound.muted = audioSystem.isMuted;
+        
+        // Stop engine sound when muted
+        if (audioSystem.isMuted) {
+            audioSystem.engineSound.pause();
+        } else if (gameStarted) {
+            try {
+                audioSystem.engineSound.play().catch(e => console.warn('Error playing engine sound:', e));
+            } catch (e) {
+                console.warn('Error playing engine sound:', e);
+            }
+        }
+    }
+    
+    // Mute/unmute sound effects
+    Object.values(audioSystem.sounds).forEach(sound => {
+        if (sound) {
+            sound.muted = audioSystem.isMuted;
+        }
+    });
+}
+
+// Play a sound effect
+function playSound(soundName) {
+    // Exit early if audio system not ready or muted
+    if (!audioSystem.sounds || !audioSystem.sounds[soundName] || audioSystem.isMuted) return;
+    
+    try {
+        // Clone the audio to allow multiple instances to play simultaneously
+        const sound = audioSystem.sounds[soundName].cloneNode();
+        if (!sound) return;
+        
+        sound.volume = audioSystem.sounds[soundName].volume;
+        
+        // Add error handling for playback
+        sound.onerror = function() {
+            console.warn(`Error playing sound: ${soundName}`);
+            sound.remove();
+        };
+        
+        // Play the sound
+        const playPromise = sound.play();
+        
+        // Handle play promise for modern browsers
+        if (playPromise !== undefined) {
+            playPromise.catch(error => {
+                console.warn(`Error starting playback of ${soundName}: ${error}`);
+                sound.remove();
+            });
+        }
+        
+        // Remove the element when finished to prevent memory leaks
+        sound.onended = function() {
+            sound.remove();
+        };
+    } catch (e) {
+        console.error(`Exception when playing sound ${soundName}:`, e);
+    }
+}
+
+// Update engine sound based on vehicle speed
+function updateEngineSound(speed) {
+    if (audioSystem.isMuted || !audioSystem.engineSound) return;
+    
+    try {
+        // Calculate playback rate based on speed (normal rate at 20 km/h)
+        const baseRate = 0.8;
+        const maxRate = 2.0;
+        let rate = baseRate + (speed / 60) * (maxRate - baseRate);
+        
+        // Clamp between reasonable values
+        rate = Math.max(baseRate, Math.min(rate, maxRate));
+        
+        // Apply the rate
+        audioSystem.engineSound.playbackRate = rate;
+        
+        // Adjust volume slightly with speed
+        audioSystem.engineSound.volume = 0.2 + (speed / 100) * 0.3;
+    } catch (e) {
+        console.warn('Error updating engine sound:', e);
+    }
+}
 
 // Detect if the user is on a mobile device
 function detectMobileDevice() {
@@ -100,6 +338,38 @@ function setupGameStart() {
         // Initialize multiplayer if ATV model is already loaded
         if (atvMesh) {
             initializeMultiplayer();
+        }
+        
+        // Start game audio
+        if (!audioSystem.isMuted) {
+            // If audio is loaded, play immediately
+            if (audioSystem.loaded) {
+                audioSystem.bgMusic.play().catch(err => console.warn('Error playing background music:', err));
+                audioSystem.engineSound.play().catch(err => console.warn('Error playing engine sound:', err));
+            } else {
+                // Otherwise wait for audio to load
+                console.log('Waiting for audio files to load...');
+                const checkAudioLoaded = setInterval(() => {
+                    if (audioSystem.loaded) {
+                        clearInterval(checkAudioLoaded);
+                        audioSystem.bgMusic.play().catch(err => console.warn('Error playing background music:', err));
+                        audioSystem.engineSound.play().catch(err => console.warn('Error playing engine sound:', err));
+                        console.log('Audio playback started after loading');
+                    }
+                }, 500);
+                
+                // Add a timeout to avoid indefinite waiting
+                setTimeout(() => {
+                    clearInterval(checkAudioLoaded);
+                    // Try to play even if loaded flag isn't set
+                    try {
+                        audioSystem.bgMusic.play().catch(() => {});
+                        audioSystem.engineSound.play().catch(() => {});
+                    } catch (e) {
+                        console.warn('Gave up waiting for audio to load properly');
+                    }
+                }, 5000);
+            }
         }
     }
 }
@@ -302,17 +572,19 @@ world.gravity.set(0, -15.82, 0);
 world.broadphase = new CANNON.NaiveBroadphase();
 world.solver.iterations = 20;
 
-// Materials
-const groundMaterial = new CANNON.Material('ground');
-const vehicleMaterial = new CANNON.Material('vehicle');
-const assetMaterial = new CANNON.Material('asset');
+// Add material properties for physics
+const groundMaterial = new CANNON.Material('groundMaterial');
+const vehicleMaterial = new CANNON.Material('vehicleMaterial');
+const assetMaterial = new CANNON.Material('assetMaterial');
+
+// Contact materials for physics interactions
 const contactMaterial = new CANNON.ContactMaterial(groundMaterial, vehicleMaterial, {
-    friction: 1.0,
-    restitution: 0.05
+    friction: 0.3,
+    restitution: 0.3
 });
 const assetContactMaterial = new CANNON.ContactMaterial(vehicleMaterial, assetMaterial, {
-    friction: 0.8,
-    restitution: 0.1
+    friction: 0.3,
+    restitution: 0.4
 });
 world.addContactMaterial(contactMaterial);
 world.addContactMaterial(assetContactMaterial);
@@ -1071,6 +1343,18 @@ function animate() {
         multiplayerManager.update();
         updatePlayerListUI();
     }
+
+    // Get velocity for HUD
+    const velocity = velocityFromChassis(new THREE.Vector3());
+    const velocityMagnitude = velocity.length();
+    
+    // Update engine sound
+    updateEngineSound(velocityMagnitude * 3.6); // Convert to km/h
+    
+    // Handle jumps and landings for sound effects - only if chassis is ready
+    if (chassisBody && atvMesh) {
+        handleJumpSounds();
+    }
 }
 animate();
 
@@ -1096,96 +1380,137 @@ function updateHUD() {
     }
 }
 
+// Add portal visited flags to track when to play sounds
+let startPortalVisited = false;
+let exitPortalVisited = false;
+
+// Add portal sound effects to the vibeVerse function
 function vibeVerse() {
     // console.log("vibeVerse function called");
     if (new URLSearchParams(window.location.search).get('portal')) {
         // <check if player has entered start portal>
-            setTimeout(function() {
-                if (typeof atvMesh !== 'undefined' && atvMesh) {
-                    const playerBox = new THREE.Box3().setFromObject(atvMesh);
-                    const portalDistance = playerBox.getCenter(new THREE.Vector3()).distanceTo(startPortalBox.getCenter(new THREE.Vector3()));
-                    if (portalDistance < 50) {
-                        // Get ref from URL params
-                        const urlParams = new URLSearchParams(window.location.search);
-                        const refUrl = urlParams.get('ref');
-                        if (refUrl) {
-                            // Add https if not present and include query params
-                            let url = refUrl;
-                            if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                                url = 'https://' + url;
-                            }
-                            const currentParams = new URLSearchParams(window.location.search);
-                            const newParams = new URLSearchParams();
-                            for (const [key, value] of currentParams) {
-                                if (key !== 'ref') { // Skip ref param since it's in the base URL
-                                    newParams.append(key, value);
-                                }
-                            }
-                            const paramString = newParams.toString();
-                            window.location.href = url + (paramString ? '?' + paramString : '');
+        if (atvMesh && startPortalBox) {
+            const playerBox = new THREE.Box3().setFromObject(atvMesh);
+            const portalDistance = playerBox.getCenter(new THREE.Vector3()).distanceTo(startPortalBox.getCenter(new THREE.Vector3()));
+            
+            // If player is within range of the portal
+            if (portalDistance < 15) {
+                // Play portal sound when first getting close
+                if (portalDistance < 10 && !startPortalVisited) {
+                    playSound('portalEnter');
+                    startPortalVisited = true;
+                }
+            }
+            
+            // Reset visited flag when far from portal
+            if (portalDistance > 30) {
+                startPortalVisited = false;
+            }
+            
+            if (playerBox.intersectsBox(startPortalBox)) {
+                // Get ref from URL params
+                const urlParams = new URLSearchParams(window.location.search);
+                const refUrl = urlParams.get('ref');
+                if (refUrl) {
+                    // Add https if not present and include query params
+                    let url = refUrl;
+                    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                        url = 'https://' + url;
+                    }
+                    const currentParams = new URLSearchParams(window.location.search);
+                    const newParams = new URLSearchParams();
+                    for (const [key, value] of currentParams) {
+                        if (key !== 'ref') { // Skip ref param since it's in the base URL
+                            newParams.append(key, value);
                         }
                     }
-                }
-            },5000);
-        // </check if player has entered start portal>
-
-    }
-
-    // <check if player has entered exit portal>
-        if (typeof atvMesh !== 'undefined' && atvMesh) {
-            // console.log("ATV mesh check passed");
-            const playerBox = new THREE.Box3().setFromObject(atvMesh);
-            // Check if player is within 50 units of the portal
-            if (typeof exitPortalBox === 'undefined') {
-                console.error("exitPortalBox is undefined in vibeVerse!");
-                return;
-            }
-            const portalCenter = exitPortalBox.getCenter(new THREE.Vector3());
-            const playerCenter = playerBox.getCenter(new THREE.Vector3());
-            // console.log("Player position:", playerCenter);
-            // console.log("Portal position:", portalCenter);
-            const portalDistance = playerCenter.distanceTo(portalCenter);
-            // console.log("Distance to portal:", portalDistance);
-            
-            if (portalDistance < 50) {
-                // console.log("Player is within 50 units of portal");
-                // Calculate current speed from vehicle velocity
-                const currentSpeed = Math.round(chassisBody.velocity.length());
-                // console.log("Current speed:", currentSpeed);
-                
-                // Start loading the next page in the background
-                const currentParams = new URLSearchParams(window.location.search);
-                const newParams = new URLSearchParams();
-                newParams.append('portal',true);
-                newParams.append('username', playerName);
-                newParams.append('color','white');
-                newParams.append('speed',currentSpeed);
-
-                for (const [key, value] of currentParams) {
-                    newParams.append(key, value);
-                }
-                const paramString = newParams.toString();
-                const nextPage = 'https://portal.pieter.com' + (paramString ? '?' + paramString : '');
-
-                // Create hidden iframe to preload next page
-                if (!document.getElementById('preloadFrame')) {
-                    const iframe = document.createElement('iframe');
-                    iframe.id = 'preloadFrame';
-                    iframe.style.display = 'none';
-                    iframe.src = nextPage;
-                    document.body.appendChild(iframe);
-                    // console.log("Preloading next page:", nextPage);
-                }
-
-                // Only redirect once actually in the portal
-                if (playerBox.intersectsBox(exitPortalBox)) {
-                    // console.log("Portal intersection detected! Redirecting to:", nextPage);
-                    window.location.href = nextPage;
+                    const paramString = newParams.toString();
+                    window.location.href = url + (paramString ? '?' + paramString : '');
                 }
             }
         }
+        // </check if player has entered start portal>
+    }
+
+    // <check if player has entered exit portal>
+    if (atvMesh && exitPortalBox) {
+        const playerBox = new THREE.Box3().setFromObject(atvMesh);
+        // Check if player is within 50 units of the portal
+        const portalCenter = exitPortalBox.getCenter(new THREE.Vector3());
+        
+        const playerCenter = playerBox.getCenter(new THREE.Vector3());
+        // console.log("Player position:", playerCenter);
+        
+        const portalDistance = playerCenter.distanceTo(portalCenter);
+        
+        // If player is within range of the portal
+        if (portalDistance < 15) {
+            // Play portal sound when first getting close
+            if (portalDistance < 10 && !exitPortalVisited) {
+                playSound('portalExit');
+                exitPortalVisited = true;
+            }
+            
+            // Start loading the next page in the background
+            const currentParams = new URLSearchParams(window.location.search);
+            const newParams = new URLSearchParams();
+            newParams.append('portal',true);
+            newParams.append('username', playerName);
+            newParams.append('color','white');
+            
+            // Calculate current speed from vehicle velocity
+            if (chassisBody) {
+                const currentSpeed = Math.round(chassisBody.velocity.length());
+                newParams.append('speed', currentSpeed);
+            }
+
+            for (const [key, value] of currentParams) {
+                newParams.append(key, value);
+            }
+            const paramString = newParams.toString();
+            const nextPage = 'https://portal.pieter.com' + (paramString ? '?' + paramString : '');
+
+            // Create hidden iframe to preload next page
+            if (!document.getElementById('preloadFrame')) {
+                const iframe = document.createElement('iframe');
+                iframe.id = 'preloadFrame';
+                iframe.style.display = 'none';
+                iframe.src = nextPage;
+                document.body.appendChild(iframe);
+                // console.log("Preloading next page:", nextPage);
+            }
+        }
+        
+        // Reset visited flag when far from portal
+        if (portalDistance > 30) {
+            exitPortalVisited = false;
+        }
+        
+        // Only redirect once actually in the portal
+        if (portalDistance < 3 || playerBox.intersectsBox(exitPortalBox)) {
+            const currentParams = new URLSearchParams(window.location.search);
+            const newParams = new URLSearchParams();
+            newParams.append('portal',true);
+            newParams.append('username', playerName);
+            newParams.append('color','white');
+            
+            // Calculate current speed from vehicle velocity
+            if (chassisBody) {
+                const currentSpeed = Math.round(chassisBody.velocity.length());
+                newParams.append('speed', currentSpeed);
+            }
+            
+            for (const [key, value] of currentParams) {
+                newParams.append(key, value);
+            }
+            const paramString = newParams.toString();
+            const nextPage = 'https://portal.pieter.com' + (paramString ? '?' + paramString : '');
+            
+            // console.log("Portal intersection detected! Redirecting to:", nextPage);
+            window.location.href = nextPage;
+        }
+    }
     // </check if player has entered exit portal>
-// </put this in your animate function>
 }
 
 // Helper to get velocity
@@ -1474,3 +1799,72 @@ function createStartPortal() {
         animateStartPortal();
     }
 }
+
+// Check if vehicle is jumping or landing for sound effects
+let isInAir = false;
+let lastY = 0; // This should be initialized with the initial chassis position
+let jumpThreshold = 0.1;
+let landingThreshold = 0.05;
+
+// Set initial lastY value when chassis is ready
+if (chassisBody) {
+    lastY = chassisBody.position.y;
+}
+
+function handleJumpSounds() {
+    if (!chassisBody) return;
+    
+    // Initialize lastY if it's the first time running the function
+    if (lastY === 0 && chassisBody.position.y !== 0) {
+        lastY = chassisBody.position.y;
+        return; // Skip the first frame to get a proper diff next time
+    }
+    
+    const currentY = chassisBody.position.y;
+    const yDiff = currentY - lastY;
+    
+    // Detect takeoff
+    if (!isInAir && yDiff > jumpThreshold) {
+        isInAir = true;
+        playSound('jump');
+    }
+    
+    // Detect landing
+    if (isInAir && yDiff < -landingThreshold && chassisBody.velocity.y < -1) {
+        isInAir = false;
+        playSound('land');
+        
+        // Play dirt sound on hard landings
+        if (chassisBody.velocity.y < -5) {
+            playSound('dirt');
+        }
+    }
+    
+    lastY = currentY;
+}
+
+// Add collision detection for sound effects
+let lastCollisionTime = 0;
+world.addEventListener('beginContact', function(event) {
+    if (!chassisBody) return;
+    
+    // Check if one of the bodies is the vehicle chassis
+    let isVehicleCollision = false;
+    let impactVelocity = 0;
+    
+    if (event.bodyA === chassisBody || event.bodyB === chassisBody) {
+        isVehicleCollision = true;
+        
+        // Calculate relative velocity between the bodies
+        const relativeVelocity = new CANNON.Vec3();
+        event.bodyB.velocity.vsub(event.bodyA.velocity, relativeVelocity);
+        impactVelocity = relativeVelocity.length();
+        
+        // Play collision sound for significant impacts with rate limiting
+        const now = performance.now();
+        if (impactVelocity > 4 && now - lastCollisionTime > 300) {
+            playSound('collision');
+            lastCollisionTime = now;
+        }
+    }
+});
