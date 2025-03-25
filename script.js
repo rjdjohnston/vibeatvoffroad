@@ -27,7 +27,6 @@ function setupGameStart() {
     const controlsInfo = document.getElementById('controls-info');
     const gameHud = document.getElementById('game-hud');
     const mobileControls = document.getElementById('mobile-controls');
-    const fullscreenButton = document.getElementById('fullscreen-button');
     
     // Check for URL parameters (from portal redirect)
     const urlParams = new URLSearchParams(window.location.search);
@@ -88,7 +87,6 @@ function setupGameStart() {
         // Show mobile controls if on a mobile device
         if (window.isMobileDevice) {
             mobileControls.classList.remove('hidden');
-            fullscreenButton.classList.remove('hidden');
             // Hide keyboard controls info on mobile
             controlsInfo.classList.add('hidden');
             setupTouchControls();
@@ -155,14 +153,6 @@ function setupTouchControls() {
     const joystickBase = document.getElementById('joystick-base');
     const acceleratorButton = document.getElementById('accelerator-button');
     const brakeButton = document.getElementById('brake-button');
-    const fullscreenButton = document.getElementById('fullscreen-button');
-    const fullscreenIcon = document.getElementById('fullscreen-icon');
-    
-    // Initialize fullscreen icon
-    updateFullscreenIcon();
-    
-    // Add fullscreen toggle
-    fullscreenButton.addEventListener('click', toggleFullscreen);
     
     // Joystick variables
     let isDragging = false;
@@ -282,54 +272,6 @@ function setupTouchControls() {
             notification.removeChild(mobileControlsMsg);
         }, 2000);
     }, 4000);
-    
-    // Fullscreen functions
-    function toggleFullscreen() {
-        if (!document.fullscreenElement && 
-            !document.mozFullScreenElement && 
-            !document.webkitFullscreenElement && 
-            !document.msFullscreenElement) {
-            // Enter fullscreen
-            if (document.documentElement.requestFullscreen) {
-                document.documentElement.requestFullscreen();
-            } else if (document.documentElement.msRequestFullscreen) {
-                document.documentElement.msRequestFullscreen();
-            } else if (document.documentElement.mozRequestFullScreen) {
-                document.documentElement.mozRequestFullScreen();
-            } else if (document.documentElement.webkitRequestFullscreen) {
-                document.documentElement.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
-            }
-        } else {
-            // Exit fullscreen
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            } else if (document.msExitFullscreen) {
-                document.msExitFullscreen();
-            } else if (document.mozCancelFullScreen) {
-                document.mozCancelFullScreen();
-            } else if (document.webkitExitFullscreen) {
-                document.webkitExitFullscreen();
-            }
-        }
-    }
-    
-    // Update fullscreen icon based on current state
-    function updateFullscreenIcon() {
-        const isFullscreen = document.fullscreenElement || 
-                           document.mozFullScreenElement || 
-                           document.webkitFullscreenElement || 
-                           document.msFullscreenElement;
-        
-        fullscreenIcon.innerHTML = isFullscreen ? 
-            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="white"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>' : 
-            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="white"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>';
-    }
-    
-    // Listen for fullscreen change events
-    document.addEventListener('fullscreenchange', updateFullscreenIcon);
-    document.addEventListener('webkitfullscreenchange', updateFullscreenIcon);
-    document.addEventListener('mozfullscreenchange', updateFullscreenIcon);
-    document.addEventListener('MSFullscreenChange', updateFullscreenIcon);
 }
 
 // Game state variables
