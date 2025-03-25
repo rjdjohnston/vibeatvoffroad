@@ -376,8 +376,8 @@ function setupTouchControls() {
         // Get the gamma rotation (left to right tilt)
         const gamma = event.gamma;
         
-        // Only apply tilt if it's significant enough
-        if (Math.abs(gamma) > 5) {
+        // Only apply tilt if it's significant enough and joystick is not active
+        if (Math.abs(gamma) > 5 && !isJoystickActive) {
             // Convert gamma (-90 to 90) to steering value
             const normalizedGamma = gamma / 45 * tiltSensitivity;
             
@@ -391,9 +391,6 @@ function setupTouchControls() {
                 controls.left = false;
                 controls.right = false;
             }
-        } else {
-            controls.left = false;
-            controls.right = false;
         }
     }
     
@@ -401,22 +398,30 @@ function setupTouchControls() {
         e.preventDefault();
         isDragging = true;
         
-        // Disable device orientation steering when joystick is active
+        // Disable device orientation controls while using joystick
         useDeviceOrientation = false;
+        
+        // Reset existing controls to prevent getting stuck
+        controls.left = false;
+        controls.right = false;
+        
+        // Initial position
+        handleJoystickMove(e);
     }
     
     function handleJoystickMove(e) {
-        e.preventDefault();
         if (!isDragging) return;
+        e.preventDefault();
         
-        const touch = e.touches[0];
-        const rect = joystickBase.getBoundingClientRect();
+        // Get touch or mouse position
+        const pointer = e.touches ? e.touches[0] : e;
+        const joystickRect = joystickBase.getBoundingClientRect();
+        const centerX = joystickRect.left + joystickRect.width / 2;
+        const centerY = joystickRect.top + joystickRect.height / 2;
         
-        // Calculate touch position relative to joystick center
-        let x = touch.clientX - rect.left - centerX;
-        let y = touch.clientY - rect.top - centerY;
-        
-        // Calculate distance from center
+        // Calculate the distance from center
+        let x = pointer.clientX - centerX;
+        let y = pointer.clientY - centerY;
         const distance = Math.sqrt(x * x + y * y);
         
         // If touch is outside the max distance, normalize it
@@ -457,15 +462,15 @@ function setupTouchControls() {
         controls.left = false;
         controls.right = false;
         
-        // Re-enable device orientation steering
+        // Mark joystick as inactive
+        isJoystickActive = false;
+        joystickPosition.x = 0;
+        joystickPosition.y = 0;
+        
+        // Re-enable device orientation steering with a small delay
         setTimeout(() => {
             useDeviceOrientation = true;
         }, 100);
-        
-        // Reset joystick position for manual tilt mode
-        joystickPosition.x = 0;
-        joystickPosition.y = 0;
-        isJoystickActive = false;
     }
     
     // Add touch prevention to stop browser behaviors that interfere with the game
@@ -1312,6 +1317,12 @@ function animate() {
         }
     }
 
+    // Ensure controls are not stuck
+    if (!isJoystickActive && !useDeviceOrientation) {
+        controls.left = false;
+        controls.right = false;
+    }
+    
     renderer.render(scene, camera);
     
     // Update multiplayer
