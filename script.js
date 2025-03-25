@@ -1152,28 +1152,50 @@ function animate() {
 
     if (controls.left) {
         // Add leaning effect when turning left at speed
-        if (currentVelocity > 5) {
+        if (currentVelocity > 2) { // Lowered threshold to match memory settings
             // Create a force that pushes the ATV to lean into the turn
             const leanDirection = new CANNON.Vec3(-1, 0, 0); // Left lean
             const worldLeanDir = chassisBody.quaternion.vmult(leanDirection);
             worldLeanDir.y = 0;
             worldLeanDir.normalize();
-            // Apply lean force - stronger at higher speeds
-            const leanFactor = Math.min(currentVelocity * 25, 500);
-            chassisBody.applyForce(worldLeanDir.scale(leanFactor), chassisBody.position);
+            
+            // Apply lean force with extreme tilting - consistent with memory settings
+            const leanFactor = Math.min(currentVelocity * 50, 2000);
+            
+            // Apply force at elevated point for more leverage (as per memory)
+            const forcePosition = new CANNON.Vec3().copy(chassisBody.position);
+            forcePosition.y += 0.5; // Apply force 0.5 units above center for more leverage
+            
+            // Apply force and direct torque for dramatic tilt
+            chassisBody.applyForce(worldLeanDir.scale(leanFactor), forcePosition);
+            
+            // Add direct torque as described in the memory
+            const tiltTorque = new CANNON.Vec3(0, 0, currentVelocity * 50);
+            chassisBody.torque.vadd(tiltTorque, chassisBody.torque);
         }
         chassisBody.angularVelocity.y = turnSpeed;
     } else if (controls.right) {
         // Add leaning effect when turning right at speed
-        if (currentVelocity > 5) {
+        if (currentVelocity > 2) { // Lowered threshold to match memory settings
             // Create a force that pushes the ATV to lean into the turn
             const leanDirection = new CANNON.Vec3(1, 0, 0); // Right lean
             const worldLeanDir = chassisBody.quaternion.vmult(leanDirection);
             worldLeanDir.y = 0;
             worldLeanDir.normalize();
-            // Apply lean force - stronger at higher speeds
-            const leanFactor = Math.min(currentVelocity * 0.5, 500);
-            chassisBody.applyForce(worldLeanDir.scale(leanFactor), chassisBody.position);
+            
+            // Apply lean force with extreme tilting - consistent with memory settings
+            const leanFactor = Math.min(currentVelocity * 50, 2000);
+            
+            // Apply force at elevated point for more leverage (as per memory)
+            const forcePosition = new CANNON.Vec3().copy(chassisBody.position);
+            forcePosition.y += 0.5; // Apply force 0.5 units above center for more leverage
+            
+            // Apply force and direct torque for dramatic tilt
+            chassisBody.applyForce(worldLeanDir.scale(leanFactor), forcePosition);
+            
+            // Add direct torque as described in the memory
+            const tiltTorque = new CANNON.Vec3(0, 0, -currentVelocity * 50);
+            chassisBody.torque.vadd(tiltTorque, chassisBody.torque);
         }
         chassisBody.angularVelocity.y = -turnSpeed;
     } else {
