@@ -246,6 +246,29 @@
             z-index: 100;
             pointer-events: none; /* Allow clicking through the container */
         }
+        #fullscreen-button {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(0, 160, 255, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 16px;
+            color: white;
+            cursor: pointer;
+            pointer-events: auto;
+            z-index: 101;
+            box-shadow: 0 0 10px rgba(0, 150, 255, 0.5);
+        }
+        #fullscreen-icon {
+            width: 20px;
+            height: 20px;
+        }
         #joystick-container {
             position: relative;
             width: 120px;
@@ -352,6 +375,9 @@
             <div id="brake-button">
                 <span>⬇</span>
             </div>
+        </div>
+        <div id="fullscreen-button">
+            <div id="fullscreen-icon"></div>
         </div>
     </div>
     
