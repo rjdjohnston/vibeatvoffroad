@@ -339,19 +339,18 @@
 </head>
 <body>
     <!-- Mobile Controls -->
-    <div id="mobile-controls" class="hidden">
-        <div id="joystick-container">
-            <div id="joystick-base">
-                <div id="joystick-thumb"></div>
+    <div id="mobile-controls" style="display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 30vh; z-index: 100; pointer-events: none;">
+        <!-- Joystick (left side) -->
+        <div id="joystick-container" style="position: absolute; bottom: 20px; left: 20px; width: 150px; height: 150px; pointer-events: auto;">
+            <div id="joystick-base" style="position: relative; width: 100%; height: 100%; background-color: rgba(255, 255, 255, 0.3); border-radius: 50%;">
+                <div id="joystick-thumb" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 50px; height: 50px; background-color: rgba(255, 255, 255, 0.8); border-radius: 50%; box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);"></div>
             </div>
         </div>
-        <div id="accelerator-container">
-            <div id="accelerator-button">
-                <span>⬆</span>
-            </div>
-            <div id="brake-button">
-                <span>⬇</span>
-            </div>
+        
+        <!-- Acceleration/Brake Buttons (right side) -->
+        <div style="position: absolute; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 20px; pointer-events: auto;">
+            <button id="accelerator-button" style="width: 80px; height: 80px; border-radius: 50%; background-color: rgba(0, 200, 0, 0.8); border: none; color: white; font-weight: bold; font-size: 16px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);">GO</button>
+            <button id="brake-button" style="width: 80px; height: 80px; border-radius: 50%; background-color: rgba(200, 0, 0, 0.8); border: none; color: white; font-weight: bold; font-size: 16px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);">STOP</button>
         </div>
     </div>
     
@@ -411,9 +410,7 @@
     </div>
     
     <!-- Notifications -->
-    <div id="notifications">
-        <!-- Notification messages will be added dynamically -->
-    </div>
+    <div id="notifications" style="position: fixed; top: 10px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; pointer-events: none; z-index: 1000;"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
