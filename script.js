@@ -234,44 +234,142 @@ function setupTouchControls() {
                             permissionMsg.innerHTML = 'Tilt steering enabled! Tilt your device to steer.';
                             notification.appendChild(permissionMsg);
                         } else {
-                            // Permission denied, update button
-                            console.log('Permission denied:', permissionState);
-                            this.style.backgroundColor = 'rgba(200, 0, 0, 0.8)';
-                            this.innerText = 'Permission Denied - Try Again';
+                            // Permission denied, but we'll still enable manual tilt mode
+                            console.log('Permission denied, enabling manual tilt mode');
+                            this.style.backgroundColor = 'rgba(50, 150, 200, 0.8)';
+                            this.innerText = 'Use Manual Tilt';
+                            
+                            // Switch to manual mode on next click
+                            this.onclick = function() {
+                                enableManualTiltMode();
+                                this.style.display = 'none';
+                            };
                         }
                     })
                     .catch(error => {
                         console.error('Error requesting device orientation permission:', error);
-                        this.style.backgroundColor = 'rgba(200, 0, 0, 0.8)';
-                        this.innerText = 'Error - Tap to Retry';
+                        // Error occurred, but we'll still enable manual tilt mode
+                        this.style.backgroundColor = 'rgba(50, 150, 200, 0.8)';
+                        this.innerText = 'Use Manual Tilt';
+                        
+                        // Switch to manual mode on next click
+                        this.onclick = function() {
+                            enableManualTiltMode();
+                            this.style.display = 'none';
+                        };
                     });
             } catch (error) {
                 console.error('Exception when requesting permission:', error);
-                this.style.backgroundColor = 'rgba(200, 0, 0, 0.8)';
-                this.innerText = 'Error - Tap to Retry';
+                // Exception occurred, but we'll still enable manual tilt mode
+                this.style.backgroundColor = 'rgba(50, 150, 200, 0.8)';
+                this.innerText = 'Use Manual Tilt';
                 
-                // Fallback for browsers that claim to support but don't
-                setTimeout(() => {
-                    console.log('Trying alternative approach for device orientation');
-                    window.addEventListener('deviceorientation', handleOrientation);
+                // Switch to manual mode on next click
+                this.onclick = function() {
+                    enableManualTiltMode();
                     this.style.display = 'none';
-                }, 1000);
+                };
             }
             
             return false; // Prevent any default behavior
         };
     } else if (window.DeviceOrientationEvent) {
-        // Non-iOS devices
+        // Non-iOS devices (Android, etc)
         console.log('Setting up device orientation for non-iOS device');
-        window.addEventListener('deviceorientation', handleOrientation);
+        
+        // Create a button to enable tilt on Android (some devices require user interaction)
+        const orientationButton = document.createElement('button');
+        orientationButton.id = 'orientation-permission';
+        orientationButton.innerText = 'Enable Tilt Steering';
+        orientationButton.style.position = 'absolute';
+        orientationButton.style.top = '50%';
+        orientationButton.style.left = '50%';
+        orientationButton.style.transform = 'translate(-50%, -50%)';
+        orientationButton.style.zIndex = '1000';
+        orientationButton.style.padding = '15px 25px';
+        orientationButton.style.backgroundColor = 'rgba(0, 100, 200, 0.8)';
+        orientationButton.style.color = 'white';
+        orientationButton.style.border = 'none';
+        orientationButton.style.borderRadius = '8px';
+        orientationButton.style.fontSize = '16px';
+        orientationButton.style.cursor = 'pointer';
+        
+        document.body.appendChild(orientationButton);
+        
+        orientationButton.onclick = function() {
+            // For Android and other devices, just try to add the listener on user interaction
+            window.addEventListener('deviceorientation', handleOrientation);
+            this.style.display = 'none';
+            
+            // Show confirmation
+            const notification = document.getElementById('notifications');
+            const permissionMsg = document.createElement('div');
+            permissionMsg.className = 'notification';
+            permissionMsg.innerHTML = 'Tilt steering enabled! Tilt your device to steer.';
+            notification.appendChild(permissionMsg);
+        };
     } else {
         console.log('Device orientation not supported on this device');
+        
+        // Offer manual tilt mode
+        const orientationButton = document.createElement('button');
+        orientationButton.id = 'orientation-permission';
+        orientationButton.innerText = 'Use Manual Tilt';
+        orientationButton.style.position = 'absolute';
+        orientationButton.style.top = '50%';
+        orientationButton.style.left = '50%';
+        orientationButton.style.transform = 'translate(-50%, -50%)';
+        orientationButton.style.zIndex = '1000';
+        orientationButton.style.padding = '15px 25px';
+        orientationButton.style.backgroundColor = 'rgba(50, 150, 200, 0.8)';
+        orientationButton.style.color = 'white';
+        orientationButton.style.border = 'none';
+        orientationButton.style.borderRadius = '8px';
+        orientationButton.style.fontSize = '16px';
+        orientationButton.style.cursor = 'pointer';
+        
+        document.body.appendChild(orientationButton);
+        
+        orientationButton.onclick = function() {
+            enableManualTiltMode();
+            this.style.display = 'none';
+        };
     }
     
-    // Tilt sensitivity control
-    let tiltSensitivity = 0.5; // Default sensitivity (0-1)
-    let useDeviceOrientation = true; // Enable/disable orientation-based controls
+    // Function to enable manual tilt mode (using joystick for tilt instead of device orientation)
+    function enableManualTiltMode() {
+        console.log('Enabling manual tilt mode');
+        
+        // Show confirmation
+        const notification = document.getElementById('notifications');
+        const manualMsg = document.createElement('div');
+        manualMsg.className = 'notification';
+        manualMsg.innerHTML = 'Manual tilt mode enabled! Use joystick for dramatic tilting.';
+        notification.appendChild(manualMsg);
+        
+        // We'll use the existing handleJoystickMove with enhanced tilt effects
+        const originalJoystickMove = handleJoystickMove;
+        
+        // Override joystick handler to include more dramatic tilting
+        handleJoystickMove = function(e) {
+            originalJoystickMove.call(this, e);
+            
+            // Add extra tilt effect based on joystick position
+            if (atvBody && isJoystickActive) {
+                const joystickTilt = joystickPosition.x / maxDistance * 2; // -2 to 2 range
+                manualTiltValue = joystickTilt;
+            }
+        };
+    }
     
+    // Tilt related variables
+    let tiltSensitivity = 0.7; // Increased sensitivity (0-1)
+    let useDeviceOrientation = true;
+    let isJoystickActive = false;
+    let joystickPosition = { x: 0, y: 0 };
+    let manualTiltValue = 0;
+    
+    // Handle device orientation for tilt-based steering
     function handleOrientation(event) {
         if (!useDeviceOrientation) return;
         
@@ -341,6 +439,11 @@ function setupTouchControls() {
             controls.left = normalizedX < 0;
             controls.right = normalizedX > 0;
         }
+        
+        // Update joystick position for manual tilt mode
+        joystickPosition.x = x;
+        joystickPosition.y = y;
+        isJoystickActive = true;
     }
     
     function handleJoystickEnd(e) {
@@ -358,6 +461,11 @@ function setupTouchControls() {
         setTimeout(() => {
             useDeviceOrientation = true;
         }, 100);
+        
+        // Reset joystick position for manual tilt mode
+        joystickPosition.x = 0;
+        joystickPosition.y = 0;
+        isJoystickActive = false;
     }
     
     // Add touch prevention to stop browser behaviors that interfere with the game
