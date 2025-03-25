@@ -210,19 +210,62 @@ function setupTouchControls() {
         
         document.body.appendChild(orientationButton);
         
-        orientationButton.addEventListener('click', () => {
-            DeviceOrientationEvent.requestPermission()
-                .then(permissionState => {
-                    if (permissionState === 'granted') {
-                        window.addEventListener('deviceorientation', handleOrientation);
-                        orientationButton.style.display = 'none';
-                    }
-                })
-                .catch(console.error);
-        });
+        // Improved click handler with better debugging
+        orientationButton.onclick = function() {
+            console.log('Tilt steering button clicked');
+            // Make the button visibly change to show it registered the click
+            this.style.backgroundColor = 'rgba(0, 200, 100, 0.8)';
+            this.innerText = 'Requesting permission...';
+            
+            // Make sure we're handling the permission request in a direct response to user interaction
+            try {
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        console.log('Permission response:', permissionState);
+                        if (permissionState === 'granted') {
+                            console.log('Device orientation permission granted');
+                            window.addEventListener('deviceorientation', handleOrientation);
+                            this.style.display = 'none';
+                            
+                            // Show confirmation message
+                            const notification = document.getElementById('notifications');
+                            const permissionMsg = document.createElement('div');
+                            permissionMsg.className = 'notification';
+                            permissionMsg.innerHTML = 'Tilt steering enabled! Tilt your device to steer.';
+                            notification.appendChild(permissionMsg);
+                        } else {
+                            // Permission denied, update button
+                            console.log('Permission denied:', permissionState);
+                            this.style.backgroundColor = 'rgba(200, 0, 0, 0.8)';
+                            this.innerText = 'Permission Denied - Try Again';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error requesting device orientation permission:', error);
+                        this.style.backgroundColor = 'rgba(200, 0, 0, 0.8)';
+                        this.innerText = 'Error - Tap to Retry';
+                    });
+            } catch (error) {
+                console.error('Exception when requesting permission:', error);
+                this.style.backgroundColor = 'rgba(200, 0, 0, 0.8)';
+                this.innerText = 'Error - Tap to Retry';
+                
+                // Fallback for browsers that claim to support but don't
+                setTimeout(() => {
+                    console.log('Trying alternative approach for device orientation');
+                    window.addEventListener('deviceorientation', handleOrientation);
+                    this.style.display = 'none';
+                }, 1000);
+            }
+            
+            return false; // Prevent any default behavior
+        };
     } else if (window.DeviceOrientationEvent) {
         // Non-iOS devices
+        console.log('Setting up device orientation for non-iOS device');
         window.addEventListener('deviceorientation', handleOrientation);
+    } else {
+        console.log('Device orientation not supported on this device');
     }
     
     // Tilt sensitivity control
@@ -703,10 +746,10 @@ function createTrackPhysics(trackModel) {
         // Create the physics body with raised position
         const rampBody = new CANNON.Body({ mass: 0, material: groundMaterial });
         const rampShape = new CANNON.Box(new CANNON.Vec3(width/2, height/2, depth/2));
-        rampBody.addShape(rampShape);
         
         // Position with specified elevation off the ground
         const yPos = elevation + height/2;
+        rampBody.addShape(rampShape);
         rampBody.position.set(x, yPos, z);
         
         // Apply rotation on x-axis
