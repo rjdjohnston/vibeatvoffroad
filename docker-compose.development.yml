@@ -1,7 +1,9 @@
 version: '3'
 services:
   vibe-atv-game-dev:
-    build: ./Dockerfile.development
+    build:
+      context: .
+      dockerfile: Dockerfile.development
     ports:
       - "8091:8091"
       # When using Cloudflare, you typically don't need this direct HTTPS port
