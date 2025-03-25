@@ -207,11 +207,22 @@ function setupTouchControls() {
         orientationButton.style.borderRadius = '8px';
         orientationButton.style.fontSize = '16px';
         orientationButton.style.cursor = 'pointer';
+        orientationButton.style.transition = 'opacity 1.5s ease-in-out';
         
         document.body.appendChild(orientationButton);
         
+        // Set up fade-out timer for tilt steering button
+        let buttonClicked = false;
+        setTimeout(() => {
+            if (!buttonClicked) {
+                orientationButton.style.opacity = '0.3';
+            }
+        }, 3000);
+        
         // Improved click handler with better debugging
         orientationButton.onclick = function() {
+            buttonClicked = true;
+            orientationButton.style.opacity = '1'; // Restore full opacity if clicked after fade
             console.log('Tilt steering button clicked');
             // Make the button visibly change to show it registered the click
             this.style.backgroundColor = 'rgba(0, 200, 100, 0.8)';
@@ -293,10 +304,21 @@ function setupTouchControls() {
         orientationButton.style.borderRadius = '8px';
         orientationButton.style.fontSize = '16px';
         orientationButton.style.cursor = 'pointer';
+        orientationButton.style.transition = 'opacity 1.5s ease-in-out';
         
         document.body.appendChild(orientationButton);
         
+        // Set up fade-out timer for tilt steering button
+        let buttonClicked = false;
+        setTimeout(() => {
+            if (!buttonClicked) {
+                orientationButton.style.opacity = '0.3';
+            }
+        }, 3000);
+        
         orientationButton.onclick = function() {
+            buttonClicked = true;
+            orientationButton.style.opacity = '1'; // Restore full opacity if clicked after fade
             // For Android and other devices, just try to add the listener on user interaction
             window.addEventListener('deviceorientation', handleOrientation);
             this.style.display = 'none';
@@ -327,10 +349,21 @@ function setupTouchControls() {
         orientationButton.style.borderRadius = '8px';
         orientationButton.style.fontSize = '16px';
         orientationButton.style.cursor = 'pointer';
+        orientationButton.style.transition = 'opacity 1.5s ease-in-out';
         
         document.body.appendChild(orientationButton);
         
+        // Set up fade-out timer for tilt steering button
+        let buttonClicked = false;
+        setTimeout(() => {
+            if (!buttonClicked) {
+                orientationButton.style.opacity = '0.3';
+            }
+        }, 3000);
+        
         orientationButton.onclick = function() {
+            buttonClicked = true;
+            orientationButton.style.opacity = '1'; // Restore full opacity if clicked after fade
             enableManualTiltMode();
             this.style.display = 'none';
         };
@@ -376,8 +409,8 @@ function setupTouchControls() {
         // Get the gamma rotation (left to right tilt)
         const gamma = event.gamma;
         
-        // Only apply tilt if it's significant enough and joystick is not active
-        if (Math.abs(gamma) > 5 && !isJoystickActive) {
+        // Only apply tilt if it's significant enough
+        if (Math.abs(gamma) > 5) {
             // Convert gamma (-90 to 90) to steering value
             const normalizedGamma = gamma / 45 * tiltSensitivity;
             
@@ -391,6 +424,9 @@ function setupTouchControls() {
                 controls.left = false;
                 controls.right = false;
             }
+        } else {
+            controls.left = false;
+            controls.right = false;
         }
     }
     
@@ -398,30 +434,22 @@ function setupTouchControls() {
         e.preventDefault();
         isDragging = true;
         
-        // Disable device orientation controls while using joystick
+        // Disable device orientation steering when joystick is active
         useDeviceOrientation = false;
-        
-        // Reset existing controls to prevent getting stuck
-        controls.left = false;
-        controls.right = false;
-        
-        // Initial position
-        handleJoystickMove(e);
     }
     
     function handleJoystickMove(e) {
-        if (!isDragging) return;
         e.preventDefault();
+        if (!isDragging) return;
         
-        // Get touch or mouse position
-        const pointer = e.touches ? e.touches[0] : e;
-        const joystickRect = joystickBase.getBoundingClientRect();
-        const centerX = joystickRect.left + joystickRect.width / 2;
-        const centerY = joystickRect.top + joystickRect.height / 2;
+        const touch = e.touches[0];
+        const rect = joystickBase.getBoundingClientRect();
         
-        // Calculate the distance from center
-        let x = pointer.clientX - centerX;
-        let y = pointer.clientY - centerY;
+        // Calculate touch position relative to joystick center
+        let x = touch.clientX - rect.left - centerX;
+        let y = touch.clientY - rect.top - centerY;
+        
+        // Calculate distance from center
         const distance = Math.sqrt(x * x + y * y);
         
         // If touch is outside the max distance, normalize it
@@ -462,15 +490,15 @@ function setupTouchControls() {
         controls.left = false;
         controls.right = false;
         
-        // Mark joystick as inactive
-        isJoystickActive = false;
-        joystickPosition.x = 0;
-        joystickPosition.y = 0;
-        
-        // Re-enable device orientation steering with a small delay
+        // Re-enable device orientation steering
         setTimeout(() => {
             useDeviceOrientation = true;
         }, 100);
+        
+        // Reset joystick position for manual tilt mode
+        joystickPosition.x = 0;
+        joystickPosition.y = 0;
+        isJoystickActive = false;
     }
     
     // Add touch prevention to stop browser behaviors that interfere with the game
@@ -1132,13 +1160,8 @@ camera.lookAt(0, 0, 0);
 // Animation loop
 let settled = false;
 let clock = new THREE.Clock();
-let isRunning = true; // Initialize isRunning to true so the animation loop runs
-
 function animate() {
     requestAnimationFrame(animate);
-    
-    if (!isRunning) return;
-    
     vibeVerse();
     world.step(1 / 60);
 
@@ -1322,12 +1345,6 @@ function animate() {
         }
     }
 
-    // Prevent controls from getting stuck
-    if (!isJoystickActive && !useDeviceOrientation) {
-        controls.left = false;
-        controls.right = false;
-    }
-    
     renderer.render(scene, camera);
     
     // Update multiplayer
