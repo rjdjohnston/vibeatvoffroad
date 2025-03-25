@@ -189,9 +189,79 @@ function setupTouchControls() {
         brakeButton.style.transform = 'scale(1)';
     });
     
+    // Handle device orientation for tilt-based steering
+    if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        // iOS 13+ requires permission
+        const orientationButton = document.createElement('button');
+        orientationButton.id = 'orientation-permission';
+        orientationButton.innerText = 'Enable Tilt Steering';
+        orientationButton.style.position = 'absolute';
+        orientationButton.style.top = '50%';
+        orientationButton.style.left = '50%';
+        orientationButton.style.transform = 'translate(-50%, -50%)';
+        orientationButton.style.zIndex = '1000';
+        orientationButton.style.padding = '15px 25px';
+        orientationButton.style.backgroundColor = 'rgba(0, 100, 200, 0.8)';
+        orientationButton.style.color = 'white';
+        orientationButton.style.border = 'none';
+        orientationButton.style.borderRadius = '8px';
+        orientationButton.style.fontSize = '16px';
+        orientationButton.style.cursor = 'pointer';
+        
+        document.body.appendChild(orientationButton);
+        
+        orientationButton.addEventListener('click', () => {
+            DeviceOrientationEvent.requestPermission()
+                .then(permissionState => {
+                    if (permissionState === 'granted') {
+                        window.addEventListener('deviceorientation', handleOrientation);
+                        orientationButton.style.display = 'none';
+                    }
+                })
+                .catch(console.error);
+        });
+    } else if (window.DeviceOrientationEvent) {
+        // Non-iOS devices
+        window.addEventListener('deviceorientation', handleOrientation);
+    }
+    
+    // Tilt sensitivity control
+    let tiltSensitivity = 0.5; // Default sensitivity (0-1)
+    let useDeviceOrientation = true; // Enable/disable orientation-based controls
+    
+    function handleOrientation(event) {
+        if (!useDeviceOrientation) return;
+        
+        // Get the gamma rotation (left to right tilt)
+        const gamma = event.gamma;
+        
+        // Only apply tilt if it's significant enough
+        if (Math.abs(gamma) > 5) {
+            // Convert gamma (-90 to 90) to steering value
+            const normalizedGamma = gamma / 45 * tiltSensitivity;
+            
+            if (normalizedGamma < -0.15) {
+                controls.left = true;
+                controls.right = false;
+            } else if (normalizedGamma > 0.15) {
+                controls.right = true;
+                controls.left = false;
+            } else {
+                controls.left = false;
+                controls.right = false;
+            }
+        } else {
+            controls.left = false;
+            controls.right = false;
+        }
+    }
+    
     function handleJoystickStart(e) {
         e.preventDefault();
         isDragging = true;
+        
+        // Disable device orientation steering when joystick is active
+        useDeviceOrientation = false;
     }
     
     function handleJoystickMove(e) {
@@ -240,6 +310,11 @@ function setupTouchControls() {
         // Reset steering controls
         controls.left = false;
         controls.right = false;
+        
+        // Re-enable device orientation steering
+        setTimeout(() => {
+            useDeviceOrientation = true;
+        }, 100);
     }
     
     // Add touch prevention to stop browser behaviors that interfere with the game
@@ -262,7 +337,7 @@ function setupTouchControls() {
     mobileControlsMsg.className = 'notification';
     mobileControlsMsg.style.animation = 'none';
     mobileControlsMsg.style.opacity = '1';
-    mobileControlsMsg.innerHTML = 'Mobile controls: Use joystick to steer and buttons to accelerate/brake.';
+    mobileControlsMsg.innerHTML = 'Mobile controls: Use joystick to steer and buttons to accelerate/brake. Tilt device for alternative steering.';
     notification.appendChild(mobileControlsMsg);
     
     // Remove the message after 10 seconds
@@ -628,10 +703,10 @@ function createTrackPhysics(trackModel) {
         // Create the physics body with raised position
         const rampBody = new CANNON.Body({ mass: 0, material: groundMaterial });
         const rampShape = new CANNON.Box(new CANNON.Vec3(width/2, height/2, depth/2));
+        rampBody.addShape(rampShape);
         
         // Position with specified elevation off the ground
         const yPos = elevation + height/2;
-        rampBody.addShape(rampShape);
         rampBody.position.set(x, yPos, z);
         
         // Apply rotation on x-axis
