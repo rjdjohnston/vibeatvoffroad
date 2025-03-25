@@ -2415,6 +2415,13 @@ function cleanupCheckpoints() {
 
 // Show a notification message
 function showNotification(message, isError = false) {
+    // Skip notifications on mobile devices to keep the UI clean
+    if (window.isMobileDevice) {
+        // Just log the notification message instead
+        console.log(`Mobile notification (${isError ? 'error' : 'info'}):`, message);
+        return;
+    }
+    
     const notification = document.createElement('div');
     notification.style.position = 'absolute';
     notification.style.top = '20px';
@@ -2887,16 +2894,32 @@ function checkCheckpoints() {
 
 // Show message when passing through a checkpoint
 function showCheckpointMessage(checkpointIndex) {
+    // For mobile, use a more compact design that's less intrusive
+    const isMobile = window.isMobileDevice;
+    
     const message = document.createElement('div');
     message.style.position = 'absolute';
-    message.style.top = '30%';
-    message.style.left = '50%';
-    message.style.transform = 'translate(-50%, -50%)';
+    
+    if (isMobile) {
+        // Mobile styling - smaller and at the top
+        message.style.top = '70px'; // Below game controls
+        message.style.left = '50%';
+        message.style.transform = 'translateX(-50%)';
+        message.style.padding = '10px 15px';
+        message.style.fontSize = '18px';
+        message.style.boxShadow = '0 2px 5px rgba(0,0,0,0.3)';
+    } else {
+        // Desktop styling - larger and centered
+        message.style.top = '30%';
+        message.style.left = '50%';
+        message.style.transform = 'translate(-50%, -50%)';
+        message.style.padding = '20px';
+        message.style.fontSize = '24px';
+    }
+    
     message.style.background = 'rgba(0, 0, 0, 0.7)';
     message.style.color = '#ffffff';
-    message.style.padding = '20px';
     message.style.borderRadius = '10px';
-    message.style.fontSize = '24px';
     message.style.fontWeight = 'bold';
     message.style.zIndex = '1000';
     message.style.textAlign = 'center';
@@ -2911,6 +2934,9 @@ function showCheckpointMessage(checkpointIndex) {
     
     document.body.appendChild(message);
     
+    // Shorter display time on mobile
+    const displayTime = isMobile ? 800 : 1000;
+    
     // Fade out and remove
     setTimeout(() => {
         message.style.transition = 'opacity 0.5s';
@@ -2918,27 +2944,50 @@ function showCheckpointMessage(checkpointIndex) {
         setTimeout(() => {
             document.body.removeChild(message);
         }, 500);
-    }, 1000);
+    }, displayTime);
 }
 
 // Show lap time message
 function showLapTimeMessage(lapTime, isBest) {
+    // For mobile, use a more compact design that's less intrusive
+    const isMobile = window.isMobileDevice;
+    
     const message = document.createElement('div');
     message.style.position = 'absolute';
-    message.style.top = '40%';
-    message.style.left = '50%';
-    message.style.transform = 'translate(-50%, -50%)';
+    
+    if (isMobile) {
+        // Mobile styling - smaller and at the top
+        message.style.top = '70px'; // Below game controls
+        message.style.left = '50%';
+        message.style.transform = 'translateX(-50%)';
+        message.style.padding = '10px 15px';
+        message.style.fontSize = '18px';
+        message.style.boxShadow = '0 2px 5px rgba(0,0,0,0.3)';
+        // Simpler content for mobile
+        message.innerHTML = isBest 
+            ? `NEW BEST! ${lapTime.toFixed(2)}s` 
+            : `LAP: ${lapTime.toFixed(2)}s`;
+    } else {
+        // Desktop styling - larger and centered
+        message.style.top = '40%';
+        message.style.left = '50%';
+        message.style.transform = 'translate(-50%, -50%)';
+        message.style.padding = '20px';
+        message.style.fontSize = '24px';
+        message.innerHTML = `${isBest ? 'NEW BEST TIME!' : 'LAP TIME'}<br>${lapTime.toFixed(2)} seconds`;
+    }
+    
     message.style.background = 'rgba(0, 0, 0, 0.7)';
     message.style.color = isBest ? '#FFD700' : '#ffffff'; // Gold for best time
-    message.style.padding = '20px';
     message.style.borderRadius = '10px';
-    message.style.fontSize = '24px';
     message.style.fontWeight = 'bold';
     message.style.zIndex = '1000';
     message.style.textAlign = 'center';
-    message.innerHTML = `${isBest ? 'NEW BEST TIME!' : 'LAP TIME'}<br>${lapTime.toFixed(2)} seconds`;
     
     document.body.appendChild(message);
+    
+    // Shorter display time on mobile
+    const displayTime = isMobile ? 1500 : 2000;
     
     // Fade out and remove
     setTimeout(() => {
@@ -2947,7 +2996,7 @@ function showLapTimeMessage(lapTime, isBest) {
         setTimeout(() => {
             document.body.removeChild(message);
         }, 500);
-    }, 2000);
+    }, displayTime);
 }
 
 // Update the checkpoint UI
@@ -2958,7 +3007,7 @@ function updateCheckpointUI() {
         checkpointStatus.id = 'checkpoint-status';
         checkpointStatus.style.position = 'absolute';
         checkpointStatus.style.top = '20px';
-        checkpointStatus.style.left = '190px';
+        checkpointStatus.style.left = '180px';
         checkpointStatus.style.color = 'white';
         checkpointStatus.style.background = 'rgba(0, 0, 0, 0.5)';
         checkpointStatus.style.padding = '10px';
@@ -3011,7 +3060,7 @@ function updateCheckpointUI() {
     const checkpointStatus = document.getElementById('checkpoint-status');
     if (checkpointStatus && checkpoints.length > 0) {
         checkpointStatus.innerHTML = `
-            <div style="font-weight: bold; margin-bottom: 5px;">CHECKPOINTS</div>
+            <div class="checkpoint-label">CHECKPOINTS</div>
             <div>Next: ${activeCheckpoint + 1} of ${checkpoints.length}</div>
         `;
     }
@@ -3020,7 +3069,7 @@ function updateCheckpointUI() {
     const lapTimeDisplay = document.getElementById('lap-time');
     if (lapTimeDisplay) {
         lapTimeDisplay.innerHTML = `
-            <div style="font-weight: bold; margin-bottom: 5px;">LAP TIMES</div>
+            <div class="checkpoint-label">LAP TIMES</div>
             <div>Current: ${currentLapTime.toFixed(2)}s</div>
             <div>Best: ${bestLapTime === Infinity ? '--' : bestLapTime.toFixed(2) + 's'}</div>
         `;

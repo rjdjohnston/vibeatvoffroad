@@ -219,6 +219,7 @@
             border-radius: 10px;
             border: 1px solid rgba(0, 160, 255, 0.5);
         }
+        
         .hud-stat {
             margin-bottom: 5px;
             display: flex;
@@ -231,6 +232,18 @@
         }
         .hud-value {
             font-family: monospace;
+        }
+
+        /* Checkpoint UI */
+        #checkpoint-status, #lap-time {
+            border-radius: 10px;
+            border: 1px solid rgba(0, 160, 255, 0.5);
+        }
+        .checkpoint-label {
+            font-weight: bold;
+            color: #00a2ff;
+            font-weight: bold; 
+            margin-bottom: 5px
         }
         
         /* Mobile Controls */
@@ -333,6 +346,9 @@
                 left: 10px;
                 font-size: 14px;
                 padding: 8px;
+            }
+            #checkpoint-status, #lap-time {
+                top: 10px;
             }
         }
     </style>
