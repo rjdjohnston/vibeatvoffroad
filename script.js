@@ -27,6 +27,7 @@ function setupGameStart() {
     const controlsInfo = document.getElementById('controls-info');
     const gameHud = document.getElementById('game-hud');
     const mobileControls = document.getElementById('mobile-controls');
+    const fullscreenButton = document.getElementById('fullscreen-button');
     
     // Check for URL parameters (from portal redirect)
     const urlParams = new URLSearchParams(window.location.search);
@@ -87,6 +88,7 @@ function setupGameStart() {
         // Show mobile controls if on a mobile device
         if (window.isMobileDevice) {
             mobileControls.classList.remove('hidden');
+            fullscreenButton.classList.remove('hidden');
             // Hide keyboard controls info on mobile
             controlsInfo.classList.add('hidden');
             setupTouchControls();

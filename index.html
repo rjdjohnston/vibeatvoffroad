@@ -28,9 +28,17 @@
             margin: 0; 
             overflow: hidden;
             font-family: 'Arial', sans-serif;
+            /* width: 100vw;
+            height: 100vh;
+            background-color: #000000; */
         }
         canvas { 
-            display: block; 
+            display: block;
+            /* width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0; */
         }
         #start-screen {
             position: absolute;
@@ -246,29 +254,6 @@
             z-index: 100;
             pointer-events: none; /* Allow clicking through the container */
         }
-        #fullscreen-button {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: rgba(0, 0, 0, 0.3);
-            border: 2px solid rgba(0, 160, 255, 0.5);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 16px;
-            color: white;
-            cursor: pointer;
-            pointer-events: auto;
-            z-index: 101;
-            box-shadow: 0 0 10px rgba(0, 150, 255, 0.5);
-        }
-        #fullscreen-icon {
-            width: 20px;
-            height: 20px;
-        }
         #joystick-container {
             position: relative;
             width: 120px;
@@ -331,6 +316,27 @@
             background: linear-gradient(to bottom, rgba(200, 50, 50, 0.7), rgba(150, 30, 30, 0.5));
         }
         
+        /* Fullscreen Button */
+        #fullscreen-button {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(0, 160, 255, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 16px;
+            color: white;
+            cursor: pointer;
+            pointer-events: auto;
+            z-index: 1001;
+            box-shadow: 0 0 10px rgba(0, 150, 255, 0.5);
+        }
+        
         /* Responsive adjustments for mobile */
         @media (max-width: 768px) {
             #start-form {
@@ -361,6 +367,11 @@
     </style>
 </head>
 <body>
+    <!-- Fullscreen Button -->
+    <div id="fullscreen-button" class="hidden">
+        <div id="fullscreen-icon"></div>
+    </div>
+    
     <!-- Mobile Controls -->
     <div id="mobile-controls" class="hidden">
         <div id="joystick-container">
@@ -375,9 +386,6 @@
             <div id="brake-button">
                 <span>⬇</span>
             </div>
-        </div>
-        <div id="fullscreen-button">
-            <div id="fullscreen-icon"></div>
         </div>
     </div>
     
