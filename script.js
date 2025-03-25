@@ -1,3 +1,25 @@
+// Add hidden class for game UI elements
+const style = document.createElement('style');
+style.textContent = `
+.hidden {
+    display: none !important;
+}
+.checkpoint-ui {
+    /* Don't set display: none here - we'll control visibility via the hidden class */
+    transition: opacity 0.3s ease-in-out;
+}
+`;
+document.head.appendChild(style);
+
+// Initialize the audio system
+let audioSystem = {
+    sounds: {},
+    bgMusic: null,
+    engineSound: null,
+    isMuted: false,
+    loaded: false
+};
+
 // Wait for DOM content to be fully loaded before setting up game start handlers
 document.addEventListener('DOMContentLoaded', function() {
     setupGameStart();
@@ -6,15 +28,6 @@ document.addEventListener('DOMContentLoaded', function() {
     detectMobileDevice();
     initAudio();
 });
-
-// Audio system
-let audioSystem = {
-    sounds: {},
-    bgMusic: null,
-    engineSound: null,
-    isMuted: false,
-    loaded: false
-};
 
 // Initialize audio system
 function initAudio() {
@@ -125,7 +138,7 @@ function createAudioControls() {
     const audioControlsDiv = document.createElement('div');
     audioControlsDiv.id = 'audio-controls';
     audioControlsDiv.style.position = 'absolute';
-    audioControlsDiv.style.top = '260px';
+    audioControlsDiv.style.top = '80px';
     audioControlsDiv.style.left = '10px';
     audioControlsDiv.style.zIndex = '100';
     
@@ -382,6 +395,14 @@ function setupGameStart() {
         // Show controls and HUD
         controlsInfo.classList.remove('hidden');
         gameHud.classList.remove('hidden');
+        
+        // Show checkpoint UI elements if they exist
+        const checkpointElements = document.querySelectorAll('.checkpoint-ui');
+        console.log("Found checkpoint UI elements:", checkpointElements.length);
+        checkpointElements.forEach(el => {
+            console.log("Showing checkpoint UI element:", el.id);
+            el.classList.remove('hidden');
+        });
         
         // Show mobile controls if on a mobile device
         if (window.isMobileDevice) {
@@ -2936,35 +2957,54 @@ function updateCheckpointUI() {
         const checkpointStatus = document.createElement('div');
         checkpointStatus.id = 'checkpoint-status';
         checkpointStatus.style.position = 'absolute';
-        checkpointStatus.style.top = '120px';
-        checkpointStatus.style.left = '20px';
+        checkpointStatus.style.top = '20px';
+        checkpointStatus.style.left = '190px';
         checkpointStatus.style.color = 'white';
         checkpointStatus.style.background = 'rgba(0, 0, 0, 0.5)';
         checkpointStatus.style.padding = '10px';
         checkpointStatus.style.borderRadius = '5px';
         checkpointStatus.style.fontSize = '16px';
         checkpointStatus.style.zIndex = '100';
+        checkpointStatus.classList.add('checkpoint-ui', 'hidden'); // Always start with hidden class
+        
+        // Show if game has already started
+        if (gameStarted) {
+            checkpointStatus.classList.remove('hidden');
+        }
+        
         document.body.appendChild(checkpointStatus);
         
         // Create lap time display
         const lapTimeDisplay = document.createElement('div');
         lapTimeDisplay.id = 'lap-time';
         lapTimeDisplay.style.position = 'absolute';
-        lapTimeDisplay.style.top = '180px';
-        lapTimeDisplay.style.left = '20px';
+        lapTimeDisplay.style.top = '20px';
+        lapTimeDisplay.style.left = '330px';
         lapTimeDisplay.style.color = 'white';
         lapTimeDisplay.style.background = 'rgba(0, 0, 0, 0.5)';
         lapTimeDisplay.style.padding = '10px';
         lapTimeDisplay.style.borderRadius = '5px';
         lapTimeDisplay.style.fontSize = '16px';
         lapTimeDisplay.style.zIndex = '100';
+        lapTimeDisplay.classList.add('checkpoint-ui', 'hidden'); // Always start with hidden class
+        
+        // Show if game has already started
+        if (gameStarted) {
+            lapTimeDisplay.classList.remove('hidden');
+        }
+        
         document.body.appendChild(lapTimeDisplay);
         
         // Show checkpoint controls when game has started
         const checkpointControls = document.getElementById('checkpoint-controls');
-        if (checkpointControls) {
+        if (checkpointControls && gameStarted) {
             checkpointControls.style.display = 'block';
         }
+    } else if (gameStarted) {
+        // If game has started, ensure all checkpoint UI elements are visible
+        document.querySelectorAll('.checkpoint-ui').forEach(el => {
+            el.classList.remove('hidden');
+        });
     }
     
     // Update checkpoint status
