@@ -232,9 +232,129 @@
         .hud-value {
             font-family: monospace;
         }
+        
+        /* Mobile Controls */
+        #mobile-controls {
+            position: absolute;
+            width: 100%;
+            height: 40vh;
+            bottom: 0;
+            left: 0;
+            display: flex;
+            justify-content: space-between;
+            padding: 20px;
+            z-index: 100;
+            pointer-events: none; /* Allow clicking through the container */
+        }
+        #joystick-container {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(0, 160, 255, 0.5);
+            pointer-events: auto; /* Make this element clickable */
+            margin-bottom: 10px;
+            box-shadow: 0 0 10px rgba(0, 150, 255, 0.5);
+        }
+        #joystick-base {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        #joystick-thumb {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #0077ff;
+            border: 1px solid #00a2ff;
+            box-shadow: 0 0 15px rgba(0, 150, 255, 0.8);
+        }
+        #accelerator-container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 20px;
+            pointer-events: auto; /* Make this element clickable */
+        }
+        #accelerator-button, #brake-button {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(0, 160, 255, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 30px;
+            color: white;
+            box-shadow: 0 0 10px rgba(0, 150, 255, 0.5);
+            -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */
+        }
+        #accelerator-button {
+            background: linear-gradient(to bottom, rgba(0, 200, 100, 0.7), rgba(0, 150, 80, 0.5));
+        }
+        #brake-button {
+            background: linear-gradient(to bottom, rgba(200, 50, 50, 0.7), rgba(150, 30, 30, 0.5));
+        }
+        
+        /* Responsive adjustments for mobile */
+        @media (max-width: 768px) {
+            #start-form {
+                max-width: 90%;
+                padding: 20px;
+            }
+            #start-form h1 {
+                font-size: 28px;
+            }
+            #notifications {
+                width: 90%;
+                bottom: 150px; /* Position above controls */
+            }
+            #scoreboard {
+                top: 10px;
+                right: 10px;
+                padding: 10px;
+                font-size: 14px;
+                min-width: 150px;
+            }
+            #game-hud {
+                top: 10px;
+                left: 10px;
+                font-size: 14px;
+                padding: 8px;
+            }
+        }
     </style>
 </head>
 <body>
+    <!-- Mobile Controls -->
+    <div id="mobile-controls" class="hidden">
+        <div id="joystick-container">
+            <div id="joystick-base">
+                <div id="joystick-thumb"></div>
+            </div>
+        </div>
+        <div id="accelerator-container">
+            <div id="accelerator-button">
+                <span>⬆</span>
+            </div>
+            <div id="brake-button">
+                <span>⬇</span>
+            </div>
+        </div>
+    </div>
+    
     <!-- Game Start Screen -->
     <div id="start-screen">
         <div id="start-form">

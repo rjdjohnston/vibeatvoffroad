@@ -3,7 +3,21 @@ document.addEventListener('DOMContentLoaded', function() {
     setupGameStart();
     createExitPortal();
     createStartPortal();
+    detectMobileDevice();
 });
+
+// Detect if the user is on a mobile device
+function detectMobileDevice() {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                    (window.innerWidth <= 800);
+    
+    if (isMobile) {
+        console.log('Mobile device detected - enabling touch controls');
+        window.isMobileDevice = true;
+    } else {
+        window.isMobileDevice = false;
+    }
+}
 
 // Setup game start event handlers
 function setupGameStart() {
@@ -12,6 +26,7 @@ function setupGameStart() {
     const usernameInput = document.getElementById('username');
     const controlsInfo = document.getElementById('controls-info');
     const gameHud = document.getElementById('game-hud');
+    const mobileControls = document.getElementById('mobile-controls');
     
     // Check for URL parameters (from portal redirect)
     const urlParams = new URLSearchParams(window.location.search);
@@ -69,6 +84,14 @@ function setupGameStart() {
         controlsInfo.classList.remove('hidden');
         gameHud.classList.remove('hidden');
         
+        // Show mobile controls if on a mobile device
+        if (window.isMobileDevice) {
+            mobileControls.classList.remove('hidden');
+            // Hide keyboard controls info on mobile
+            controlsInfo.classList.add('hidden');
+            setupTouchControls();
+        }
+        
         // Set game as started
         gameStarted = true;
         
@@ -79,6 +102,251 @@ function setupGameStart() {
             initializeMultiplayer();
         }
     }
+}
+
+// Keyboard controls
+const controls = { forward: false, backward: false, left: false, right: false };
+document.addEventListener('keydown', (event) => {
+    switch (event.key) {
+        case 'w': 
+        case 'ArrowUp': 
+            controls.forward = true; 
+            break;
+        case 's': 
+        case 'ArrowDown': 
+            controls.backward = true; 
+            break;
+        case 'a': 
+        case 'ArrowLeft': 
+            controls.left = true; 
+            break;
+        case 'd': 
+        case 'ArrowRight': 
+            controls.right = true; 
+            break;
+    }
+});
+document.addEventListener('keyup', (event) => {
+    switch (event.key) {
+        case 'w': 
+        case 'ArrowUp': 
+            controls.forward = false; 
+            break;
+        case 's': 
+        case 'ArrowDown': 
+            controls.backward = false; 
+            break;
+        case 'a': 
+        case 'ArrowLeft': 
+            controls.left = false; 
+            break;
+        case 'd': 
+        case 'ArrowRight': 
+            controls.right = false; 
+            break;
+    }
+});
+
+// Setup touch controls for mobile devices
+function setupTouchControls() {
+    const joystickThumb = document.getElementById('joystick-thumb');
+    const joystickBase = document.getElementById('joystick-base');
+    const acceleratorButton = document.getElementById('accelerator-button');
+    const brakeButton = document.getElementById('brake-button');
+    
+    // Joystick variables
+    let isDragging = false;
+    const joystickBaseRect = joystickBase.getBoundingClientRect();
+    const centerX = joystickBaseRect.width / 2;
+    const centerY = joystickBaseRect.height / 2;
+    const maxDistance = joystickBaseRect.width / 2 - joystickThumb.clientWidth / 2;
+    
+    // Touch event handlers for joystick (steering)
+    joystickBase.addEventListener('touchstart', handleJoystickStart);
+    joystickBase.addEventListener('touchmove', handleJoystickMove);
+    joystickBase.addEventListener('touchend', handleJoystickEnd);
+    document.addEventListener('touchcancel', handleJoystickEnd);
+    
+    // Touch event handlers for accelerator and brake buttons
+    acceleratorButton.addEventListener('touchstart', (e) => { 
+        e.preventDefault();
+        controls.forward = true; 
+        acceleratorButton.style.transform = 'scale(0.9)';
+    });
+    acceleratorButton.addEventListener('touchend', (e) => { 
+        e.preventDefault();
+        controls.forward = false; 
+        acceleratorButton.style.transform = 'scale(1)';
+    });
+    brakeButton.addEventListener('touchstart', (e) => { 
+        e.preventDefault();
+        controls.backward = true; 
+        brakeButton.style.transform = 'scale(0.9)';
+    });
+    brakeButton.addEventListener('touchend', (e) => { 
+        e.preventDefault();
+        controls.backward = false; 
+        brakeButton.style.transform = 'scale(1)';
+    });
+    
+    // Handle device orientation for tilt-based steering
+    if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
+        // iOS 13+ requires permission
+        const orientationButton = document.createElement('button');
+        orientationButton.id = 'orientation-permission';
+        orientationButton.innerText = 'Enable Tilt Steering';
+        orientationButton.style.position = 'absolute';
+        orientationButton.style.top = '50%';
+        orientationButton.style.left = '50%';
+        orientationButton.style.transform = 'translate(-50%, -50%)';
+        orientationButton.style.zIndex = '1000';
+        orientationButton.style.padding = '15px 25px';
+        orientationButton.style.backgroundColor = 'rgba(0, 100, 200, 0.8)';
+        orientationButton.style.color = 'white';
+        orientationButton.style.border = 'none';
+        orientationButton.style.borderRadius = '8px';
+        orientationButton.style.fontSize = '16px';
+        orientationButton.style.cursor = 'pointer';
+        
+        document.body.appendChild(orientationButton);
+        
+        orientationButton.addEventListener('click', () => {
+            DeviceOrientationEvent.requestPermission()
+                .then(permissionState => {
+                    if (permissionState === 'granted') {
+                        window.addEventListener('deviceorientation', handleOrientation);
+                        orientationButton.style.display = 'none';
+                    }
+                })
+                .catch(console.error);
+        });
+    } else if (window.DeviceOrientationEvent) {
+        // Non-iOS devices
+        window.addEventListener('deviceorientation', handleOrientation);
+    }
+    
+    // Tilt sensitivity control
+    let tiltSensitivity = 0.5; // Default sensitivity (0-1)
+    let useDeviceOrientation = true; // Enable/disable orientation-based controls
+    
+    function handleOrientation(event) {
+        if (!useDeviceOrientation) return;
+        
+        // Get the gamma rotation (left to right tilt)
+        const gamma = event.gamma;
+        
+        // Only apply tilt if it's significant enough
+        if (Math.abs(gamma) > 5) {
+            // Convert gamma (-90 to 90) to steering value
+            const normalizedGamma = gamma / 45 * tiltSensitivity;
+            
+            if (normalizedGamma < -0.15) {
+                controls.left = true;
+                controls.right = false;
+            } else if (normalizedGamma > 0.15) {
+                controls.right = true;
+                controls.left = false;
+            } else {
+                controls.left = false;
+                controls.right = false;
+            }
+        } else {
+            controls.left = false;
+            controls.right = false;
+        }
+    }
+    
+    function handleJoystickStart(e) {
+        e.preventDefault();
+        isDragging = true;
+        
+        // Disable device orientation steering when joystick is active
+        useDeviceOrientation = false;
+    }
+    
+    function handleJoystickMove(e) {
+        e.preventDefault();
+        if (!isDragging) return;
+        
+        const touch = e.touches[0];
+        const rect = joystickBase.getBoundingClientRect();
+        
+        // Calculate touch position relative to joystick center
+        let x = touch.clientX - rect.left - centerX;
+        let y = touch.clientY - rect.top - centerY;
+        
+        // Calculate distance from center
+        const distance = Math.sqrt(x * x + y * y);
+        
+        // If touch is outside the max distance, normalize it
+        if (distance > maxDistance) {
+            x = (x / distance) * maxDistance;
+            y = (y / distance) * maxDistance;
+        }
+        
+        // Move joystick thumb
+        joystickThumb.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+        
+        // Normalize x to a range of -1 to 1 for steering
+        const normalizedX = x / maxDistance;
+        
+        // Apply some deadzone to prevent unintended steering
+        if (Math.abs(normalizedX) < 0.15) {
+            controls.left = false;
+            controls.right = false;
+        } else {
+            controls.left = normalizedX < 0;
+            controls.right = normalizedX > 0;
+        }
+    }
+    
+    function handleJoystickEnd(e) {
+        if (e) e.preventDefault();
+        isDragging = false;
+        
+        // Reset joystick thumb position
+        joystickThumb.style.transform = 'translate(-50%, -50%)';
+        
+        // Reset steering controls
+        controls.left = false;
+        controls.right = false;
+        
+        // Re-enable device orientation steering
+        setTimeout(() => {
+            useDeviceOrientation = true;
+        }, 100);
+    }
+    
+    // Add touch prevention to stop browser behaviors that interfere with the game
+    document.addEventListener('touchmove', function(e) {
+        if (gameStarted) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+    
+    // Prevent zooming
+    document.addEventListener('gesturestart', function(e) {
+        if (gameStarted) {
+            e.preventDefault();
+        }
+    });
+    
+    // Add a notification about the controls
+    const notification = document.getElementById('notifications');
+    const mobileControlsMsg = document.createElement('div');
+    mobileControlsMsg.className = 'notification';
+    mobileControlsMsg.style.animation = 'none';
+    mobileControlsMsg.style.opacity = '1';
+    mobileControlsMsg.innerHTML = 'Mobile controls: Use joystick to steer and buttons to accelerate/brake. Tilt device for alternative steering.';
+    notification.appendChild(mobileControlsMsg);
+    
+    // Remove the message after 10 seconds
+    setTimeout(() => {
+        mobileControlsMsg.style.animation = 'fadeOut 2s forwards';
+        setTimeout(() => {
+            notification.removeChild(mobileControlsMsg);
+        }, 2000);
+    }, 10000);
 }
 
 // Game state variables
@@ -704,49 +972,6 @@ document.body.appendChild(speedometer);
 // Camera setup
 camera.position.set(0, 10, -30);
 camera.lookAt(0, 0, 0);
-
-// Keyboard controls
-const controls = { forward: false, backward: false, left: false, right: false };
-document.addEventListener('keydown', (event) => {
-    switch (event.key) {
-        case 'w': 
-        case 'ArrowUp': 
-            controls.forward = true; 
-            break;
-        case 's': 
-        case 'ArrowDown': 
-            controls.backward = true; 
-            break;
-        case 'a': 
-        case 'ArrowLeft': 
-            controls.left = true; 
-            break;
-        case 'd': 
-        case 'ArrowRight': 
-            controls.right = true; 
-            break;
-    }
-});
-document.addEventListener('keyup', (event) => {
-    switch (event.key) {
-        case 'w': 
-        case 'ArrowUp': 
-            controls.forward = false; 
-            break;
-        case 's': 
-        case 'ArrowDown': 
-            controls.backward = false; 
-            break;
-        case 'a': 
-        case 'ArrowLeft': 
-            controls.left = false; 
-            break;
-        case 'd': 
-        case 'ArrowRight': 
-            controls.right = false; 
-            break;
-    }
-});
 
 // Animation loop
 let settled = false;
