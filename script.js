@@ -156,10 +156,7 @@ function setupTouchControls() {
     
     // Joystick variables
     let isDragging = false;
-    const joystickBaseRect = joystickBase.getBoundingClientRect();
-    const centerX = joystickBaseRect.width / 2;
-    const centerY = joystickBaseRect.height / 2;
-    const maxDistance = joystickBaseRect.width / 2 - joystickThumb.clientWidth / 2;
+    let maxDistance = 0; // Will be calculated dynamically on touch
     
     // Touch event handlers for joystick (steering)
     joystickBase.addEventListener('touchstart', handleJoystickStart);
@@ -168,30 +165,155 @@ function setupTouchControls() {
     document.addEventListener('touchcancel', handleJoystickEnd);
     
     // Touch event handlers for accelerator and brake buttons
-    acceleratorButton.addEventListener('touchstart', (e) => { 
+    acceleratorButton.addEventListener('touchstart', function(e) { 
         e.preventDefault();
-        e.stopPropagation(); // Prevent event propagation
+        e.stopPropagation();
         controls.forward = true; 
         acceleratorButton.style.transform = 'scale(0.9)';
     });
-    acceleratorButton.addEventListener('touchend', (e) => { 
+    acceleratorButton.addEventListener('touchend', function(e) { 
         e.preventDefault();
-        e.stopPropagation(); // Prevent event propagation
+        e.stopPropagation();
         controls.forward = false; 
         acceleratorButton.style.transform = 'scale(1)';
     });
-    brakeButton.addEventListener('touchstart', (e) => { 
+    brakeButton.addEventListener('touchstart', function(e) { 
         e.preventDefault();
-        e.stopPropagation(); // Prevent event propagation
+        e.stopPropagation();
         controls.backward = true; 
         brakeButton.style.transform = 'scale(0.9)';
     });
-    brakeButton.addEventListener('touchend', (e) => { 
+    brakeButton.addEventListener('touchend', function(e) { 
         e.preventDefault();
-        e.stopPropagation(); // Prevent event propagation
+        e.stopPropagation();
         controls.backward = false; 
         brakeButton.style.transform = 'scale(1)';
     });
+    
+    // Handle joystick touch events
+    function handleJoystickStart(e) {
+        e.preventDefault();
+        isDragging = true;
+        
+        // Calculate joystick parameters on every touch start to ensure accuracy
+        const rect = joystickBase.getBoundingClientRect();
+        const thumbRect = joystickThumb.getBoundingClientRect();
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        
+        // Calculate max distance dynamically
+        maxDistance = Math.min(rect.width, rect.height) / 2.5;
+        
+        // Get initial touch position
+        if (e.touches && e.touches[0]) {
+            const touch = e.touches[0];
+            
+            // Calculate touch position relative to joystick center
+            let x = touch.clientX - rect.left - centerX;
+            let y = touch.clientY - rect.top - centerY;
+            
+            // Calculate distance from center
+            const distance = Math.sqrt(x * x + y * y);
+            
+            // If touch is outside the max distance, normalize it
+            if (distance > maxDistance) {
+                x = (x / distance) * maxDistance;
+                y = (y / distance) * maxDistance;
+            }
+            
+            // Move joystick thumb to initial position
+            joystickThumb.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+            
+            // Apply controls based on joystick position
+            const normalizedX = x / maxDistance;
+            
+            // Apply some deadzone to prevent unintended steering
+            if (Math.abs(normalizedX) < 0.15) {
+                controls.left = false;
+                controls.right = false;
+            } else {
+                controls.left = normalizedX < 0;
+                controls.right = normalizedX > 0;
+            }
+            
+            // Update joystick position for manual tilt mode
+            joystickPosition.x = x;
+            joystickPosition.y = y;
+            isJoystickActive = true;
+        }
+        
+        // Disable device orientation steering when joystick is active
+        useDeviceOrientation = false;
+    }
+    
+    function handleJoystickMove(e) {
+        e.preventDefault();
+        if (!isDragging) return;
+        
+        // Get current touch position
+        const touch = e.touches[0];
+        if (!touch) return; // Safety check
+        
+        // Calculate joystick parameters on every move
+        const rect = joystickBase.getBoundingClientRect();
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        
+        // Calculate touch position relative to joystick center
+        let x = touch.clientX - rect.left - centerX;
+        let y = touch.clientY - rect.top - centerY;
+        
+        // Calculate distance from center
+        const distance = Math.sqrt(x * x + y * y);
+        
+        // If touch is outside the max distance, normalize it
+        if (distance > maxDistance) {
+            x = (x / distance) * maxDistance;
+            y = (y / distance) * maxDistance;
+        }
+        
+        // Move joystick thumb
+        joystickThumb.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+        
+        // Normalize x to a range of -1 to 1 for steering
+        const normalizedX = x / maxDistance;
+        
+        // Apply some deadzone to prevent unintended steering
+        if (Math.abs(normalizedX) < 0.15) {
+            controls.left = false;
+            controls.right = false;
+        } else {
+            controls.left = normalizedX < 0;
+            controls.right = normalizedX > 0;
+        }
+        
+        // Update joystick position for manual tilt mode
+        joystickPosition.x = x;
+        joystickPosition.y = y;
+        isJoystickActive = true;
+    }
+    
+    function handleJoystickEnd(e) {
+        if (e) e.preventDefault();
+        isDragging = false;
+        
+        // Reset joystick thumb position
+        joystickThumb.style.transform = 'translate(-50%, -50%)';
+        
+        // Reset steering controls
+        controls.left = false;
+        controls.right = false;
+        
+        // Re-enable device orientation steering after a short delay
+        setTimeout(() => {
+            useDeviceOrientation = true;
+        }, 100);
+        
+        // Reset joystick position for manual tilt mode
+        joystickPosition.x = 0;
+        joystickPosition.y = 0;
+        isJoystickActive = false;
+    }
     
     // Handle device orientation for tilt-based steering
     if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -399,112 +521,6 @@ function setupTouchControls() {
             controls.left = false;
             controls.right = false;
         }
-    }
-    
-    function handleJoystickStart(e) {
-        e.preventDefault();
-        e.stopPropagation(); // Prevent event propagation issues
-        isDragging = true;
-        
-        // Get initial touch position to ensure proper first calculation
-        if (e.touches && e.touches[0]) {
-            const touch = e.touches[0];
-            const rect = joystickBase.getBoundingClientRect();
-            const centerX = rect.width / 2;
-            const centerY = rect.height / 2;
-            
-            // Calculate touch position relative to joystick center
-            let x = touch.clientX - rect.left - centerX;
-            let y = touch.clientY - rect.top - centerY;
-            
-            // Calculate distance from center
-            const distance = Math.sqrt(x * x + y * y);
-            
-            // If touch is outside the max distance, normalize it
-            if (distance > maxDistance) {
-                x = (x / distance) * maxDistance;
-                y = (y / distance) * maxDistance;
-            }
-            
-            // Move joystick thumb to initial position
-            joystickThumb.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
-            
-            // Update joystick position for manual tilt mode
-            joystickPosition.x = x;
-            joystickPosition.y = y;
-        }
-        
-        // Disable device orientation steering when joystick is active
-        useDeviceOrientation = false;
-    }
-    
-    function handleJoystickMove(e) {
-        e.preventDefault();
-        e.stopPropagation(); // Prevent event propagation
-        if (!isDragging) return;
-        
-        const touch = e.touches[0];
-        const rect = joystickBase.getBoundingClientRect();
-        
-        // Calculate touch position relative to joystick center
-        const centerX = rect.width / 2;
-        const centerY = rect.height / 2;
-        let x = touch.clientX - rect.left - centerX;
-        let y = touch.clientY - rect.top - centerY;
-        
-        // Calculate distance from center
-        const distance = Math.sqrt(x * x + y * y);
-        
-        // If touch is outside the max distance, normalize it
-        if (distance > maxDistance) {
-            x = (x / distance) * maxDistance;
-            y = (y / distance) * maxDistance;
-        }
-        
-        // Move joystick thumb
-        joystickThumb.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
-        
-        // Normalize x to a range of -1 to 1 for steering
-        const normalizedX = x / maxDistance;
-        
-        // Apply some deadzone to prevent unintended steering
-        if (Math.abs(normalizedX) < 0.15) {
-            controls.left = false;
-            controls.right = false;
-        } else {
-            controls.left = normalizedX < 0;
-            controls.right = normalizedX > 0;
-        }
-        
-        // Update joystick position for manual tilt mode
-        joystickPosition.x = x;
-        joystickPosition.y = y;
-        isJoystickActive = true;
-    }
-    
-    function handleJoystickEnd(e) {
-        if (e) {
-            e.preventDefault();
-            e.stopPropagation(); // Prevent event propagation
-        }
-        isDragging = false;
-        
-        // Reset joystick thumb position
-        joystickThumb.style.transform = 'translate(-50%, -50%)';
-        
-        // Reset steering controls
-        controls.left = false;
-        controls.right = false;
-        
-        // Re-enable device orientation steering
-        setTimeout(() => {
-            useDeviceOrientation = true;
-        }, 100);
-        
-        // Reset joystick position for manual tilt mode
-        joystickPosition.x = 0;
-        joystickPosition.y = 0;
-        isJoystickActive = false;
     }
     
     // Add touch prevention to stop browser behaviors that interfere with the game
