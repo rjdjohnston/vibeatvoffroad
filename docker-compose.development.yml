@@ -1,0 +1,31 @@
+version: '3'
+services:
+  vibe-atv-game-dev:
+    build: ./Dockerfile.development
+    ports:
+      - "8091:8091"
+      # When using Cloudflare, you typically don't need this direct HTTPS port
+      # as Cloudflare handles the SSL termination
+      # - "8443:8443"
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      # Using Cloudflare Flexible SSL, we don't need certificates on the origin server
+      # - ./certs/server.key:/app/certs/server.key
+      # - ./certs/server.crt:/app/certs/server.crt
+    environment:
+      - NODE_ENV=production
+      - PORT=8090
+      # With Flexible SSL, we're telling the server not to look for certificates
+      - SSL_KEY_PATH=
+      - SSL_CERT_PATH=
+      # Add Cloudflare-specific environment variable
+      - USING_CLOUDFLARE=true
+    restart: unless-stopped
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    external:
+      name: dggames_app-network
