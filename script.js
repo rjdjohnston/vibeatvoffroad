@@ -265,13 +265,13 @@ function setupTouchControls() {
     mobileControlsMsg.innerHTML = 'Mobile controls: Use joystick to steer and buttons to accelerate/brake.';
     notification.appendChild(mobileControlsMsg);
     
-    // Remove the message after 4 seconds
+    // Remove the message after 10 seconds
     setTimeout(() => {
         mobileControlsMsg.style.animation = 'fadeOut 2s forwards';
         setTimeout(() => {
             notification.removeChild(mobileControlsMsg);
         }, 2000);
-    }, 4000);
+    }, 10000);
 }
 
 // Game state variables
