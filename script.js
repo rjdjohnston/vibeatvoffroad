@@ -189,79 +189,9 @@ function setupTouchControls() {
         brakeButton.style.transform = 'scale(1)';
     });
     
-    // Handle device orientation for tilt-based steering
-    if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
-        // iOS 13+ requires permission
-        const orientationButton = document.createElement('button');
-        orientationButton.id = 'orientation-permission';
-        orientationButton.innerText = 'Enable Tilt Steering';
-        orientationButton.style.position = 'absolute';
-        orientationButton.style.top = '50%';
-        orientationButton.style.left = '50%';
-        orientationButton.style.transform = 'translate(-50%, -50%)';
-        orientationButton.style.zIndex = '1000';
-        orientationButton.style.padding = '15px 25px';
-        orientationButton.style.backgroundColor = 'rgba(0, 100, 200, 0.8)';
-        orientationButton.style.color = 'white';
-        orientationButton.style.border = 'none';
-        orientationButton.style.borderRadius = '8px';
-        orientationButton.style.fontSize = '16px';
-        orientationButton.style.cursor = 'pointer';
-        
-        document.body.appendChild(orientationButton);
-        
-        orientationButton.addEventListener('click', () => {
-            DeviceOrientationEvent.requestPermission()
-                .then(permissionState => {
-                    if (permissionState === 'granted') {
-                        window.addEventListener('deviceorientation', handleOrientation);
-                        orientationButton.style.display = 'none';
-                    }
-                })
-                .catch(console.error);
-        });
-    } else if (window.DeviceOrientationEvent) {
-        // Non-iOS devices
-        window.addEventListener('deviceorientation', handleOrientation);
-    }
-    
-    // Tilt sensitivity control
-    let tiltSensitivity = 0.5; // Default sensitivity (0-1)
-    let useDeviceOrientation = true; // Enable/disable orientation-based controls
-    
-    function handleOrientation(event) {
-        if (!useDeviceOrientation) return;
-        
-        // Get the gamma rotation (left to right tilt)
-        const gamma = event.gamma;
-        
-        // Only apply tilt if it's significant enough
-        if (Math.abs(gamma) > 5) {
-            // Convert gamma (-90 to 90) to steering value
-            const normalizedGamma = gamma / 45 * tiltSensitivity;
-            
-            if (normalizedGamma < -0.15) {
-                controls.left = true;
-                controls.right = false;
-            } else if (normalizedGamma > 0.15) {
-                controls.right = true;
-                controls.left = false;
-            } else {
-                controls.left = false;
-                controls.right = false;
-            }
-        } else {
-            controls.left = false;
-            controls.right = false;
-        }
-    }
-    
     function handleJoystickStart(e) {
         e.preventDefault();
         isDragging = true;
-        
-        // Disable device orientation steering when joystick is active
-        useDeviceOrientation = false;
     }
     
     function handleJoystickMove(e) {
@@ -310,11 +240,6 @@ function setupTouchControls() {
         // Reset steering controls
         controls.left = false;
         controls.right = false;
-        
-        // Re-enable device orientation steering
-        setTimeout(() => {
-            useDeviceOrientation = true;
-        }, 100);
     }
     
     // Add touch prevention to stop browser behaviors that interfere with the game
@@ -337,16 +262,16 @@ function setupTouchControls() {
     mobileControlsMsg.className = 'notification';
     mobileControlsMsg.style.animation = 'none';
     mobileControlsMsg.style.opacity = '1';
-    mobileControlsMsg.innerHTML = 'Mobile controls: Use joystick to steer and buttons to accelerate/brake. Tilt device for alternative steering.';
+    mobileControlsMsg.innerHTML = 'Mobile controls: Use joystick to steer and buttons to accelerate/brake.';
     notification.appendChild(mobileControlsMsg);
     
-    // Remove the message after 10 seconds
+    // Remove the message after 4 seconds
     setTimeout(() => {
         mobileControlsMsg.style.animation = 'fadeOut 2s forwards';
         setTimeout(() => {
             notification.removeChild(mobileControlsMsg);
         }, 2000);
-    }, 10000);
+    }, 4000);
 }
 
 // Game state variables
@@ -703,14 +628,38 @@ function createTrackPhysics(trackModel) {
         // Create the physics body with raised position
         const rampBody = new CANNON.Body({ mass: 0, material: groundMaterial });
         const rampShape = new CANNON.Box(new CANNON.Vec3(width/2, height/2, depth/2));
-        rampBody.addShape(rampShape);
         
-        // Position with specified elevation off the ground
-        const yPos = elevation + height/2;
+        // Calculate the vertical offset to make the edge flush with the ground
+        // For x-axis rotation (north/south ramps)
+        let yPos = 0;
+        if (axis === 'x') {
+            // If angle is negative (upward at front), we need to lower the back
+            // If angle is positive (upward at back), we need to lower the front
+            const edgeOffset = angle < 0 ? 
+                Math.sin(Math.abs(angle)) * depth/1 : // For negative angle (north ramp)
+                -Math.sin(Math.abs(angle)) * depth/1;  // For positive angle (south ramp)
+            yPos = height/2 + edgeOffset;
+        }
+        // For z-axis rotation (east/west ramps)
+        else if (axis === 'z') {
+            // If angle is negative (upward at right), we need to lower the left
+            // If angle is positive (upward at left), we need to lower the right
+            const edgeOffset = angle < 0 ? 
+                Math.sin(Math.abs(angle)) * depth/1 : // For negative angle (east ramp)
+                -Math.sin(Math.abs(angle)) * depth/1;  // For positive angle (west ramp)
+            yPos = height/2 + edgeOffset;
+        }
+        
+        rampBody.addShape(rampShape);
         rampBody.position.set(x, yPos, z);
         
-        // Apply rotation on x-axis
-        const rotationAxis = new CANNON.Vec3(1, 0, 0);
+        // Apply rotation based on axis
+        const rotationAxis = new CANNON.Vec3();
+        if (axis === 'x') {
+            rotationAxis.set(1, 0, 0);
+        } else if (axis === 'z') {
+            rotationAxis.set(0, 0, 1);
+        }
         rampBody.quaternion.setFromAxisAngle(rotationAxis, angle);
         world.addBody(rampBody);
         
@@ -727,7 +676,11 @@ function createTrackPhysics(trackModel) {
         
         // Position the mesh to match the physics body
         rampMesh.position.copy(rampBody.position);
-        rampMesh.rotation.x = angle;
+        if (axis === 'x') {
+            rampMesh.rotation.x = angle;
+        } else if (axis === 'z') {
+            rampMesh.rotation.z = angle;
+        }
         
         scene.add(rampMesh);
         
@@ -745,7 +698,7 @@ function createTrackPhysics(trackModel) {
         // Return the mesh in case it's needed for reference
         return rampMesh;
     }
-
+    
     // Create the four ramps - make the angles more gradual and heights lower
     // createRamp(x, z, width, height, depth, angle, axis, color)
     // North ramp (red) - more gradual approach
@@ -1299,11 +1252,32 @@ function showRespawnMessage() {
 }
 
 // Resize handler
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
+window.addEventListener('resize', handleResize);
+
+// Initial sizing
+handleResize();
+
+function handleResize() {
+    // Get the actual window dimensions
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    
+    // Update camera aspect ratio
+    camera.aspect = width / height;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-});
+    
+    // Set renderer size to match window dimensions exactly
+    renderer.setSize(width, height, false);
+    
+    // For mobile: ensure pixel ratio is handled correctly to avoid blurriness
+    const pixelRatio = window.devicePixelRatio || 1;
+    renderer.setPixelRatio(pixelRatio);
+    
+    // Force a render to update the display
+    if (gameStarted) {
+        renderer.render(scene, camera);
+    }
+}
 
 // Create player list UI
 function createPlayerListUI() {
