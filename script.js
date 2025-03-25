@@ -590,7 +590,7 @@ world.addContactMaterial(contactMaterial);
 world.addContactMaterial(assetContactMaterial);
 
 // Lighting
-const ambientLight = new THREE.AmbientLight(0x505050);
+const ambientLight = new THREE.AmbientLight(0xeeeeee);
 scene.add(ambientLight);
 const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
 directionalLight.position.set(0, 1, 0);
