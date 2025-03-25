@@ -14,8 +14,8 @@ services:
       # - ./certs/server.key:/app/certs/server.key
       # - ./certs/server.crt:/app/certs/server.crt
     environment:
-      - NODE_ENV=production
-      - PORT=8090
+      - NODE_ENV=development
+      - PORT=8091
       # With Flexible SSL, we're telling the server not to look for certificates
       - SSL_KEY_PATH=
       - SSL_CERT_PATH=
