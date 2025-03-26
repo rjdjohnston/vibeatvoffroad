@@ -1,3 +1,6 @@
+// Import the track loader
+import TrackLoader from './tracks/TrackLoader.js';
+
 // Add hidden class for game UI elements
 const style = document.createElement('style');
 style.textContent = `
@@ -453,6 +456,9 @@ function setupGameStart() {
                 }, 5000);
             }
         }
+        
+        // Load track using our new track loader system
+        loadTrack();
     }
 }
 
@@ -682,6 +688,17 @@ const assetContactMaterial = new CANNON.ContactMaterial(vehicleMaterial, assetMa
 world.addContactMaterial(contactMaterial);
 world.addContactMaterial(assetContactMaterial);
 
+// Initialize track loader
+const trackLoader = new TrackLoader({
+    scene: scene,
+    world: world,
+    materials: {
+        ground: groundMaterial,
+        vehicle: vehicleMaterial,
+        asset: assetMaterial
+    }
+});
+
 // Lighting
 const ambientLight = new THREE.AmbientLight(0xeeeeee);
 scene.add(ambientLight);
@@ -718,354 +735,33 @@ textureLoader.load(
     (error) => console.error('Skybox loading failed:', error)
 );
 
-// Load 3D Race Track Model
-gltfLoader.load(
-    'models/tracks/drift_race_track.glb',
-    (gltf) => {
-        // Add the track to the scene
-        trackMesh = gltf.scene;
-        
-        // You may need to adjust scale based on your model
-        trackMesh.scale.set(5, 5, 5);
-        
-        // You may need to adjust position based on your model
-        trackMesh.position.set(0, -1, 0);
-        
-        // You may need to adjust rotation based on your model
-        // trackMesh.rotation.y = Math.PI / 2;
-        
-        // Add to scene
-        scene.add(trackMesh);
-        
-        // console.log('3D track model loaded successfully:', trackMesh);
-        
-        // Add physics for the track using a simplified approach
-        createTrackPhysics(trackMesh);
-        
-        // Adjust ATV starting position to match the new track
-        if (chassisBody) {
-            chassisBody.position.set(20, 10, 20); // Increased height for safety
-            chassisBody.velocity.set(0, 0, 0);
-            chassisBody.angularVelocity.set(0, 0, 0);
-            chassisBody.quaternion.set(0, 0, 0, 1);
-        }
-        
-        // Initialize checkpoints after track is loaded
-        initCheckpoints();
-    },
-    () => {}, // Removed console.log from progress callback
-    (error) => console.error('3D track loading failed:', error)
-);
-
-// Function to create physics for the track
-function createTrackPhysics(trackModel) {
-    // console.log("Creating physics for track model");
-    
-    // First, we'll create a series of box colliders that approximate the track surface
-    // This is more reliable than trying to create a trimesh from the complex geometry
-    
-    // Create main track body
-    const trackPhysicsBody = new CANNON.Body({
-        mass: 0,
-        material: groundMaterial
-    });
-    
-    // These variables will store the bounding box of the track to help us create physics
-    let minX = Infinity;
-    let maxX = -Infinity;
-    let minY = Infinity;
-    let maxY = -Infinity;
-    let minZ = Infinity;
-    let maxZ = -Infinity;
-    
-    // Traverse the model to find its bounding box dimensions
-    trackModel.traverse((child) => {
-        if (child.isMesh && child.geometry) {
-            child.geometry.computeBoundingBox();
-            const boundingBox = child.geometry.boundingBox;
-            
-            // Transform bounding box by the mesh's world matrix
-            child.updateMatrixWorld(true);
-            boundingBox.applyMatrix4(child.matrixWorld);
-            
-            // Update min/max values
-            minX = Math.min(minX, boundingBox.min.x);
-            maxX = Math.max(maxX, boundingBox.max.x);
-            minY = Math.min(minY, boundingBox.min.y);
-            maxY = Math.max(maxY, boundingBox.max.y);
-            minZ = Math.min(minZ, boundingBox.min.z);
-            maxZ = Math.max(maxZ, boundingBox.max.z);
-        }
-    });
-    
-    // console.log("Track bounding box:", 
-    //     "X:", minX, "to", maxX,
-    //     "Y:", minY, "to", maxY,
-    //     "Z:", minZ, "to", maxZ
-    // );
-    
-    // Calculate track dimensions from the actual bounding box
-    // Expand the size by a multiplier to ensure it covers the visual area
-    const sizeMultiplier = 5.0; // Make the collider twice as large
-    const trackWidth = (maxX - minX) / 2 * sizeMultiplier;
-    const trackLength = (maxZ - minZ) / 2 * sizeMultiplier;
-    const trackHeight = 1;  // Keep this relatively thin
-    
-    // Calculate the center position
-    const centerX = (maxX + minX) / 2;
-    const centerZ = (maxZ + minZ) / 2;
-    const centerY = minY; // Use the bottom of the track as the y-position
-    
-    // Create a main platform as a base collider with the actual dimensions
-    const baseShape = new CANNON.Box(new CANNON.Vec3(trackWidth, trackHeight, trackLength));
-    trackPhysicsBody.addShape(baseShape);
-    
-    // Position the track collider at the calculated center
-    trackPhysicsBody.position.set(centerX, centerY, centerZ);
-    world.addBody(trackPhysicsBody);
-    trackCollider = trackPhysicsBody;
-    
-    // console.log("Added main track collider with dimensions:", 
-    //     "Width:", trackWidth * 6, 
-    //     "Length:", trackLength * 6,
-    //     "Position:", trackPhysicsBody.position
-    // );
-    
-    // Create invisible walls around the track to keep the ATV from falling off
-    const wallHeight = 5;
-    const wallThickness = 1;
-    
-    // Use the expanded bounds for wall placement
-    const wallX = maxX * sizeMultiplier;
-    const wallZ = maxZ * sizeMultiplier;
-    const negWallX = minX * sizeMultiplier;
-    const negWallZ = minZ * sizeMultiplier;
-    
-    // North wall (Z max)
-    const northWallShape = new CANNON.Box(new CANNON.Vec3(trackWidth, wallHeight, wallThickness));
-    const northWallBody = new CANNON.Body({ mass: 0, material: groundMaterial });
-    northWallBody.addShape(northWallShape);
-    northWallBody.position.set(centerX, centerY + wallHeight, wallZ);
-    world.addBody(northWallBody);
-    
-    // South wall (Z min)
-    const southWallShape = new CANNON.Box(new CANNON.Vec3(trackWidth, wallHeight, wallThickness));
-    const southWallBody = new CANNON.Body({ mass: 0, material: groundMaterial });
-    southWallBody.addShape(southWallShape);
-    southWallBody.position.set(centerX, centerY + wallHeight, negWallZ);
-    world.addBody(southWallBody);
-    
-    // East wall (X max)
-    const eastWallShape = new CANNON.Box(new CANNON.Vec3(wallThickness, wallHeight, trackLength));
-    const eastWallBody = new CANNON.Body({ mass: 0, material: groundMaterial });
-    eastWallBody.addShape(eastWallShape);
-    eastWallBody.position.set(wallX, centerY + wallHeight, centerZ);
-    world.addBody(eastWallBody);
-    
-    // West wall (X min)
-    const westWallShape = new CANNON.Box(new CANNON.Vec3(wallThickness, wallHeight, trackLength));
-    const westWallBody = new CANNON.Body({ mass: 0, material: groundMaterial });
-    westWallBody.addShape(westWallShape);
-    westWallBody.position.set(negWallX, centerY + wallHeight, centerZ);
-    world.addBody(westWallBody);
-    
-    // Create a debug visual to see the physics shape
-    const debugGeometry = new THREE.BoxGeometry(trackWidth * 2, trackHeight * 2, trackLength * 2);
-    const debugMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xff0000, 
-        wireframe: true,
-        opacity: 0.5,
-        transparent: true
-    });
-    const debugMesh = new THREE.Mesh(debugGeometry, debugMaterial);
-    debugMesh.position.copy(trackPhysicsBody.position);
-    debugMesh.visible = false; // Hide the red track boundary
-    scene.add(debugMesh);
-    
-    // Also add debug visualizations for the walls
-    const wallMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0x00ff00, 
-        wireframe: true,
-        opacity: 0.3,
-        transparent: true
-    });
-    
-    // North wall debug
-    const northWallGeo = new THREE.BoxGeometry(trackWidth * 2, wallHeight * 2, wallThickness * 2);
-    const northWallDebug = new THREE.Mesh(northWallGeo, wallMaterial);
-    northWallDebug.position.copy(northWallBody.position);
-    northWallDebug.visible = false; // Hide the green wall boundary
-    scene.add(northWallDebug);
-    
-    // South wall debug
-    const southWallGeo = new THREE.BoxGeometry(trackWidth * 2, wallHeight * 2, wallThickness * 2);
-    const southWallDebug = new THREE.Mesh(southWallGeo, wallMaterial);
-    southWallDebug.position.copy(southWallBody.position);
-    southWallDebug.visible = false; // Hide the green wall boundary
-    scene.add(southWallDebug);
-    
-    // East wall debug
-    const eastWallGeo = new THREE.BoxGeometry(wallThickness * 2, wallHeight * 2, trackLength * 2);
-    const eastWallDebug = new THREE.Mesh(eastWallGeo, wallMaterial);
-    eastWallDebug.position.copy(eastWallBody.position);
-    eastWallDebug.visible = false; // Hide the green wall boundary
-    scene.add(eastWallDebug);
-    
-    // West wall debug
-    const westWallGeo = new THREE.BoxGeometry(wallThickness * 2, wallHeight * 2, trackLength * 2);
-    const westWallDebug = new THREE.Mesh(westWallGeo, wallMaterial);
-    westWallDebug.position.copy(westWallBody.position);
-    westWallDebug.visible = false; // Hide the green wall boundary
-    scene.add(westWallDebug);
-    
-    // Add ramps to the track with a much simpler implementation
-    function createRamp(x, z, width, height, depth, angle, axis, color) {
-        // Create the physics body - position is key for a smooth transition
-        const rampBody = new CANNON.Body({ mass: 0, material: groundMaterial });
-        const rampShape = new CANNON.Box(new CANNON.Vec3(width/2, height/2, depth/2));
-        
-        // Calculate the vertical offset to make the edge flush with the ground
-        // For x-axis rotation (north/south ramps)
-        let yPos = 0;
-        if (axis === 'x') {
-            // If angle is negative (upward at front), we need to lower the back
-            // If angle is positive (upward at back), we need to lower the front
-            const edgeOffset = angle < 0 ? 
-                Math.sin(Math.abs(angle)) * depth/1 : // For negative angle (north ramp)
-                -Math.sin(Math.abs(angle)) * depth/1;  // For positive angle (south ramp)
-            yPos = height/2 + edgeOffset;
-        }
-        // For z-axis rotation (east/west ramps)
-        else if (axis === 'z') {
-            // If angle is negative (upward at right), we need to lower the left
-            // If angle is positive (upward at left), we need to lower the right
-            const edgeOffset = angle < 0 ? 
-                Math.sin(Math.abs(angle)) * depth/1 : // For negative angle (east ramp)
-                -Math.sin(Math.abs(angle)) * depth/1;  // For positive angle (west ramp)
-            yPos = height/2 + edgeOffset;
-        }
-        
-        rampBody.addShape(rampShape);
-        rampBody.position.set(x, yPos, z);
-        
-        // Apply rotation based on axis
-        const rotationAxis = new CANNON.Vec3();
-        if (axis === 'x') {
-            rotationAxis.set(1, 0, 0);
-        } else if (axis === 'z') {
-            rotationAxis.set(0, 0, 1);
-        }
-        rampBody.quaternion.setFromAxisAngle(rotationAxis, angle);
-        world.addBody(rampBody);
-        
-        // Create the visual representation
-        const rampGeometry = new THREE.BoxGeometry(width, height, depth);
-        const rampMaterial = new THREE.MeshStandardMaterial({
-            color: color,
-            roughness: 0.7,
-            metalness: 0.2,
-            emissive: color,
-            emissiveIntensity: 0.3
-        });
-        const rampMesh = new THREE.Mesh(rampGeometry, rampMaterial);
-        
-        // Position the mesh to match the physics body
-        rampMesh.position.copy(rampBody.position);
-        if (axis === 'x') {
-            rampMesh.rotation.x = angle;
-        } else if (axis === 'z') {
-            rampMesh.rotation.z = angle;
-        }
-        
-        scene.add(rampMesh);
-        
-        // Add spotlight for better visibility
-        const spotLight = new THREE.SpotLight(color, 1.5);
-        spotLight.position.set(x, 30, z);
-        spotLight.target = rampMesh;
-        spotLight.angle = Math.PI / 6;
-        spotLight.penumbra = 0.2;
-        spotLight.distance = 100;
-        scene.add(spotLight);
-        
-        // console.log(`Created ramp at (${x}, ${yPos}, ${z}) with rotation ${angle} on ${axis} axis`);
-    }
-    
-    // Function for creating elevated portal ramps with custom parameters
-    function createPortalRamp(x, z, width, height, depth, angle, elevation, color) {
-        // Create the physics body with raised position
-        const rampBody = new CANNON.Body({ mass: 0, material: groundMaterial });
-        const rampShape = new CANNON.Box(new CANNON.Vec3(width/2, height/2, depth/2));
-        rampBody.addShape(rampShape);
-        
-        // Position with specified elevation off the ground
-        const yPos = elevation + height/2;
-        rampBody.position.set(x, yPos, z);
-        
-        // Apply rotation on x-axis
-        const rotationAxis = new CANNON.Vec3(1, 0, 0);
-        rampBody.quaternion.setFromAxisAngle(rotationAxis, angle);
-        world.addBody(rampBody);
-        
-        // Create the visual representation
-        const rampGeometry = new THREE.BoxGeometry(width, height, depth);
-        const rampMaterial = new THREE.MeshStandardMaterial({
-            color: color,
-            roughness: 0.7,
-            metalness: 0.2,
-            emissive: color,
-            emissiveIntensity: 0.3
-        });
-        const rampMesh = new THREE.Mesh(rampGeometry, rampMaterial);
-        
-        // Position the mesh to match the physics body
-        rampMesh.position.copy(rampBody.position);
-        rampMesh.rotation.x = angle;
-        
-        scene.add(rampMesh);
-        
-        // Add spotlight for better visibility
-        const spotLight = new THREE.SpotLight(color, 1.5);
-        spotLight.position.set(x, 30, z);
-        spotLight.target = rampMesh;
-        spotLight.angle = Math.PI / 6;
-        spotLight.penumbra = 0.2;
-        spotLight.distance = 100;
-        scene.add(spotLight);
-        
-        // console.log(`Created portal ramp at (${x}, ${yPos}, ${z}) with elevation ${elevation}, angle ${angle}`);
-        
-        // Return the mesh in case it's needed for reference
-        return rampMesh;
-    }
-
-    // Create the four ramps - make the angles more gradual and heights lower
-    // createRamp(x, z, width, height, depth, angle, axis, color)
-    // North ramp (red) - more gradual approach
-    createRamp(0, 680, 40, 15, 50, Math.PI/12, 'x', 0xFF0000);
-    
-    // East ramp (green) - more gradual approach
-    createRamp(150, 220, 30, 15, 50, Math.PI/12, 'z', 0x00FF00);
-    
-    // South ramp (blue) - more gradual approach
-    createRamp(0, -500, 40, 15, 50, Math.PI/12, 'z', 0x0000FF);
-    
-    // West ramp (yellow) - more gradual approach
-    createRamp(-50, -50, 30, 15, 50, Math.PI/12, 'z', 0xFFFF00);
-
-    // Portal ramp - leading up to the exit portal (purple)
-    createPortalRamp(-200, -250, 45, 5, 60, Math.PI/12, 2, 0x8A2BE2); // Purple
-    
-    // console.log("Track physics created");
-}
-
 // Create a simple ground plane as fallback (positioned much lower as a safety net)
 const fallbackGroundShape = new CANNON.Plane();
 const groundBody = new CANNON.Body({ mass: 0, material: groundMaterial });
 groundBody.addShape(fallbackGroundShape);
 groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
-groundBody.position.set(0, -20, 0); // Much lower as a final safety net
+groundBody.position.set(0, -50, 0); // Position much lower than the track
 world.addBody(groundBody);
+
+// Load 3D Race Track Model when game starts
+function loadTrack() {
+    // Load the default track (drift race track)
+    trackLoader.loadTrack('drift-race')
+        .then(track => {
+            console.log('Successfully loaded track:', track.name);
+            trackMesh = track.trackMesh;
+            trackCollider = track.trackCollider;
+        })
+        .catch(error => {
+            console.error('Error loading track:', error);
+        });
+}
+
+// Function to create physics for the track - kept for backward compatibility
+function createTrackPhysics(trackModel) {
+    // This function is now handled by the track modules
+    console.log("Track physics now handled by track modules");
+}
 
 // ATV physics
 // For chassis dimensions (width, height, length)
@@ -1745,15 +1441,15 @@ function createExitPortal() {
     // Add portal label
     const loader = new THREE.TextureLoader();
     const canvas = document.createElement('canvas');
-    const context = canvas.getContext('2d');
-    canvas.width = 512; // Increased width
+    canvas.width = 512; 
     canvas.height = 64;
+    const context = canvas.getContext('2d');
     context.fillStyle = '#00ff00';
     context.font = 'bold 32px Arial';
     context.textAlign = 'center';
     context.fillText('VIBEVERSE PORTAL', canvas.width/2, canvas.height/2);
     const texture = new THREE.CanvasTexture(canvas);
-    const labelGeometry = new THREE.PlaneGeometry(30, 5); // Increased width
+    const labelGeometry = new THREE.PlaneGeometry(30, 5); 
     const labelMaterial = new THREE.MeshBasicMaterial({
         map: texture,
         transparent: true,
@@ -2025,7 +1721,7 @@ function initCheckpoints() {
     window.addEventListener('keydown', (event) => {
         console.log("Key pressed:", event.key, "isAuthorizedEditor:", isAuthorizedEditor, "gameStarted:", gameStarted);
         if (event.key.toLowerCase() === 'e' && gameStarted) {
-            console.log("E key pressed, isAuthorizedEditor:", isAuthorizedEditor);
+            console.log("E key pressed, authorized:", isAuthorizedEditor);
             // Check if player is authorized to edit
             if (isAuthorizedEditor) {
                 toggleEditMode();
@@ -2509,13 +2205,28 @@ function toggleEditMode() {
 // Save checkpoint positions to localStorage
 function saveCheckpointPositions() {
     const trackId = 'drift_race_track'; // Unique ID for the current track
+    
+    // Get the configuration name
+    const configNameInput = document.getElementById('config-name-input');
+    const configName = (configNameInput ? configNameInput.value : trackConfigName) || 'default';
+    
+    // Create the export data
     const positions = checkpoints.map(cp => ({
         x: cp.mesh.position.x,
         y: cp.mesh.position.y,
         z: cp.mesh.position.z
     }));
     
-    localStorage.setItem(`checkpoints_${trackId}`, JSON.stringify(positions));
+    const exportData = {
+        trackId: trackId,
+        configName: configName,
+        date: new Date().toISOString(),
+        positions: positions
+    };
+    
+    // Convert to JSON and save to localStorage
+    const jsonData = JSON.stringify(exportData, null, 2);
+    localStorage.setItem(`checkpoints_${trackId}`, jsonData);
     checkpointPositions = positions;
     
     // Update UI
