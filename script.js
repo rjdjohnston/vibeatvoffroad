@@ -927,85 +927,7 @@ function animate() {
         // Get current velocity for lean calculations
         const currentVelocity = chassisBody.velocity.length();
         
-        // Apply wheel turning and movement forces
-        // if (controls.forward) {
-        //     // Apply forward force - negative because of the direction vector
-        //     const forwardForce = -speed * 5;
-        //     chassisBody.applyForce(worldDirection.scale(forwardForce), chassisBody.position);
-            
-        //     // Spin the wheels forward
-        //     if (window.wheelBodies) {
-        //         window.wheelBodies.forEach(wheel => {
-        //             // Get the axis for this wheel in world space
-        //             const wheelAxis = new CANNON.Vec3(1, 0, 0); // Local x-axis
-        //             const worldAxis = chassisBody.quaternion.vmult(wheelAxis);
-        //             // Apply torque to wheel based on speed
-        //             wheel.angularVelocity.set(
-        //                 worldAxis.x * -speed * 0.05,
-        //                 worldAxis.y * -speed * 0.05,
-        //                 worldAxis.z * -speed * 0.05
-        //             );
-        //         });
-        //     }
-        // } else if (controls.backward) {
-        //     // Apply backward force
-        //     const backwardForce = speed * 3;
-        //     chassisBody.applyForce(worldDirection.scale(backwardForce), chassisBody.position);
-            
-        //     // Spin the wheels backward
-        //     if (window.wheelBodies) {
-        //         window.wheelBodies.forEach(wheel => {
-        //             // Get the axis for this wheel in world space
-        //             const wheelAxis = new CANNON.Vec3(1, 0, 0); // Local x-axis
-        //             const worldAxis = chassisBody.quaternion.vmult(wheelAxis);
-        //             // Apply torque to wheel based on speed
-        //             wheel.angularVelocity.set(
-        //                 worldAxis.x * speed * 0.03,
-        //                 worldAxis.y * speed * 0.03,
-        //                 worldAxis.z * speed * 0.03
-        //             );
-        //         });
-        //     }
-        // } else {
-        //     // Apply some friction to wheels when not accelerating
-        //     if (window.wheelBodies) {
-        //         window.wheelBodies.forEach(wheel => {
-        //             wheel.angularVelocity.scale(0.95, wheel.angularVelocity);
-        //         });
-        //     }
-        // }
-
-        // // Handle turning
-        // if (controls.left) {
-        //     // Add leaning effect when turning left at speed
-        //     if (currentVelocity > 5) {
-        //         // Create a force that pushes the ATV to lean into the turn
-        //         const leanDirection = new CANNON.Vec3(-1, 0, 0); // Left lean
-        //         const worldLeanDir = chassisBody.quaternion.vmult(leanDirection);
-        //         worldLeanDir.y = 0;
-        //         worldLeanDir.normalize();
-        //         // Apply lean force - stronger at higher speeds
-        //         const leanFactor = Math.min(currentVelocity * 15, 500);
-        //         chassisBody.applyForce(worldLeanDir.scale(leanFactor), chassisBody.position);
-        //     }
-        //     chassisBody.angularVelocity.y = turnSpeed;
-        // } else if (controls.right) {
-        //     // Add leaning effect when turning right at speed
-        //     if (currentVelocity > 5) {
-        //         // Create a force that pushes the ATV to lean into the turn
-        //         const leanDirection = new CANNON.Vec3(1, 0, 0); // Right lean
-        //         const worldLeanDir = chassisBody.quaternion.vmult(leanDirection);
-        //         worldLeanDir.y = 0;
-        //         worldLeanDir.normalize();
-        //         // Apply lean force - stronger at higher speeds
-        //         const leanFactor = Math.min(currentVelocity * 15, 500);
-        //         chassisBody.applyForce(worldLeanDir.scale(leanFactor), chassisBody.position);
-        //     }
-        //     chassisBody.angularVelocity.y = -turnSpeed;
-        // } else {
-        //     chassisBody.angularVelocity.y *= 0.9;
-        // }
-
+        // Apply wheel turning and movement force
         if (controls.forward) {
             chassisBody.applyForce(worldDirection.scale(-speed * 5), chassisBody.position);
         } else if (controls.backward) {
@@ -2890,4 +2812,6 @@ function initializeMultiplayer() {
         multiplayerManager.init();
     }
 }
+
+// Start animation loop
 animate();
