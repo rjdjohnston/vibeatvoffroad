@@ -443,6 +443,9 @@ function startGame(startScreen, usernameInput, controlsInfo, gameHud, mobileCont
         // Initialize the ATV physics and make it visible
         initializeATVAndTrack();
         
+        // Initialize checkpoints for the track
+        initCheckpoints();
+        
         // Initialize multiplayer
         initializeMultiplayer();
         
@@ -925,54 +928,90 @@ function animate() {
         const currentVelocity = chassisBody.velocity.length();
         
         // Apply wheel turning and movement forces
-        if (controls.forward) {
-            // Apply forward force - negative because of the direction vector
-            const forwardForce = -speed * 5;
-            chassisBody.applyForce(worldDirection.scale(forwardForce), chassisBody.position);
+        // if (controls.forward) {
+        //     // Apply forward force - negative because of the direction vector
+        //     const forwardForce = -speed * 5;
+        //     chassisBody.applyForce(worldDirection.scale(forwardForce), chassisBody.position);
             
-            // Spin the wheels forward
-            if (window.wheelBodies) {
-                window.wheelBodies.forEach(wheel => {
-                    // Get the axis for this wheel in world space
-                    const wheelAxis = new CANNON.Vec3(1, 0, 0); // Local x-axis
-                    const worldAxis = chassisBody.quaternion.vmult(wheelAxis);
-                    // Apply torque to wheel based on speed
-                    wheel.angularVelocity.set(
-                        worldAxis.x * -speed * 0.05,
-                        worldAxis.y * -speed * 0.05,
-                        worldAxis.z * -speed * 0.05
-                    );
-                });
-            }
-        } else if (controls.backward) {
-            // Apply backward force
-            const backwardForce = speed * 3;
-            chassisBody.applyForce(worldDirection.scale(backwardForce), chassisBody.position);
+        //     // Spin the wheels forward
+        //     if (window.wheelBodies) {
+        //         window.wheelBodies.forEach(wheel => {
+        //             // Get the axis for this wheel in world space
+        //             const wheelAxis = new CANNON.Vec3(1, 0, 0); // Local x-axis
+        //             const worldAxis = chassisBody.quaternion.vmult(wheelAxis);
+        //             // Apply torque to wheel based on speed
+        //             wheel.angularVelocity.set(
+        //                 worldAxis.x * -speed * 0.05,
+        //                 worldAxis.y * -speed * 0.05,
+        //                 worldAxis.z * -speed * 0.05
+        //             );
+        //         });
+        //     }
+        // } else if (controls.backward) {
+        //     // Apply backward force
+        //     const backwardForce = speed * 3;
+        //     chassisBody.applyForce(worldDirection.scale(backwardForce), chassisBody.position);
             
-            // Spin the wheels backward
-            if (window.wheelBodies) {
-                window.wheelBodies.forEach(wheel => {
-                    // Get the axis for this wheel in world space
-                    const wheelAxis = new CANNON.Vec3(1, 0, 0); // Local x-axis
-                    const worldAxis = chassisBody.quaternion.vmult(wheelAxis);
-                    // Apply torque to wheel based on speed
-                    wheel.angularVelocity.set(
-                        worldAxis.x * speed * 0.03,
-                        worldAxis.y * speed * 0.03,
-                        worldAxis.z * speed * 0.03
-                    );
-                });
-            }
-        } else {
-            // Apply some friction to wheels when not accelerating
-            if (window.wheelBodies) {
-                window.wheelBodies.forEach(wheel => {
-                    wheel.angularVelocity.scale(0.95, wheel.angularVelocity);
-                });
-            }
-        }
+        //     // Spin the wheels backward
+        //     if (window.wheelBodies) {
+        //         window.wheelBodies.forEach(wheel => {
+        //             // Get the axis for this wheel in world space
+        //             const wheelAxis = new CANNON.Vec3(1, 0, 0); // Local x-axis
+        //             const worldAxis = chassisBody.quaternion.vmult(wheelAxis);
+        //             // Apply torque to wheel based on speed
+        //             wheel.angularVelocity.set(
+        //                 worldAxis.x * speed * 0.03,
+        //                 worldAxis.y * speed * 0.03,
+        //                 worldAxis.z * speed * 0.03
+        //             );
+        //         });
+        //     }
+        // } else {
+        //     // Apply some friction to wheels when not accelerating
+        //     if (window.wheelBodies) {
+        //         window.wheelBodies.forEach(wheel => {
+        //             wheel.angularVelocity.scale(0.95, wheel.angularVelocity);
+        //         });
+        //     }
+        // }
 
-        // Handle turning
+        // // Handle turning
+        // if (controls.left) {
+        //     // Add leaning effect when turning left at speed
+        //     if (currentVelocity > 5) {
+        //         // Create a force that pushes the ATV to lean into the turn
+        //         const leanDirection = new CANNON.Vec3(-1, 0, 0); // Left lean
+        //         const worldLeanDir = chassisBody.quaternion.vmult(leanDirection);
+        //         worldLeanDir.y = 0;
+        //         worldLeanDir.normalize();
+        //         // Apply lean force - stronger at higher speeds
+        //         const leanFactor = Math.min(currentVelocity * 15, 500);
+        //         chassisBody.applyForce(worldLeanDir.scale(leanFactor), chassisBody.position);
+        //     }
+        //     chassisBody.angularVelocity.y = turnSpeed;
+        // } else if (controls.right) {
+        //     // Add leaning effect when turning right at speed
+        //     if (currentVelocity > 5) {
+        //         // Create a force that pushes the ATV to lean into the turn
+        //         const leanDirection = new CANNON.Vec3(1, 0, 0); // Right lean
+        //         const worldLeanDir = chassisBody.quaternion.vmult(leanDirection);
+        //         worldLeanDir.y = 0;
+        //         worldLeanDir.normalize();
+        //         // Apply lean force - stronger at higher speeds
+        //         const leanFactor = Math.min(currentVelocity * 15, 500);
+        //         chassisBody.applyForce(worldLeanDir.scale(leanFactor), chassisBody.position);
+        //     }
+        //     chassisBody.angularVelocity.y = -turnSpeed;
+        // } else {
+        //     chassisBody.angularVelocity.y *= 0.9;
+        // }
+
+        if (controls.forward) {
+            chassisBody.applyForce(worldDirection.scale(-speed * 5), chassisBody.position);
+        } else if (controls.backward) {
+            chassisBody.applyForce(worldDirection.scale(speed * 3), chassisBody.position); // Less power for reverse
+        }
+    
         if (controls.left) {
             // Add leaning effect when turning left at speed
             if (currentVelocity > 5) {
@@ -1019,6 +1058,21 @@ function animate() {
             atvMesh.position.copy(chassisBody.position);
             atvMesh.position.y += 1.7;
             atvMesh.quaternion.copy(chassisBody.quaternion);
+
+            // Check for checkpoint collisions
+            checkCheckpoints();
+            
+            // Update lap timer every frame if timing is active
+            if (lastCheckpointTime > 0) {
+                const currentTime = performance.now();
+                currentLapTime = (currentTime - lastCheckpointTime) / 1000; // Convert to seconds
+                updateCheckpointUI();
+            }
+
+            // If game has started, show checkpoint controls (only for authorized editor)
+            if (gameStarted && document.getElementById('checkpoint-controls') && isAuthorizedEditor) {
+                document.getElementById('checkpoint-controls').style.display = 'block';
+            }
 
             // Dust particles
             const velocityMagnitude = Math.sqrt(chassisBody.velocity.x ** 2 + chassisBody.velocity.z ** 2);
@@ -1133,9 +1187,6 @@ function animate() {
         if (chassisBody && atvMesh) {
             handleJumpSounds();
         }
-        
-        // Check for checkpoint collisions
-        checkCheckpoints();
         
         // Update lap timer every frame if timing is active
         if (lastCheckpointTime > 0) {
@@ -2407,6 +2458,106 @@ function updateCheckpointCollider(checkpoint) {
     }
 }
 
+// Create a text label showing the checkpoint number
+// Create a number label for the checkpoint
+function createCheckpointNumber(x, y, z, index) {
+    // Create a floating number above the checkpoint
+    const group = new THREE.Group();
+    group.position.set(x, y + 15, z);
+    
+    // Create text texture
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    
+    // Clear background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw circle border
+    ctx.beginPath();
+    ctx.arc(64, 64, 60, 0, Math.PI * 2);
+    ctx.lineWidth = 6;
+    
+    // Color based on checkpoint index
+    if (index === 0) {
+        ctx.strokeStyle = '#4CAF50'; // Green
+        ctx.fillStyle = 'rgba(76, 175, 80, 0.3)'; // Semi-transparent green
+    } else if (index === 1) {
+        ctx.strokeStyle = '#2196F3'; // Blue
+        ctx.fillStyle = 'rgba(33, 150, 243, 0.3)'; // Semi-transparent blue
+    } else if (index === 2) {
+        ctx.strokeStyle = '#FF9800'; // Orange
+        ctx.fillStyle = 'rgba(255, 152, 0, 0.3)'; // Semi-transparent orange
+    } else {
+        ctx.strokeStyle = '#9C27B0'; // Purple
+        ctx.fillStyle = 'rgba(156, 39, 176, 0.3)'; // Semi-transparent purple
+    }
+    
+    ctx.fill();
+    ctx.stroke();
+    
+    // Draw number
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 80px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Show the checkpoint number (start/finish is 0, display as "S")
+    const displayText = index === 0 ? 'S' : index.toString();
+    ctx.fillText(displayText, 64, 64);
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    const material = new THREE.SpriteMaterial({ 
+        map: texture,
+        transparent: true,
+        depthTest: false // Make sure it's always visible
+    });
+    
+    const sprite = new THREE.Sprite(material);
+    sprite.scale.set(10, 10, 1);
+    group.add(sprite);
+    
+    // Animation ID to allow for cleanup
+    let animationId;
+    
+    // Add animation effect to make the number float up and down
+    const animate = function() {
+        // Small float up and down motion
+        group.position.y = y + 15 + Math.sin(Date.now() * 0.001) * 2;
+        
+        // Rotate to face the camera
+        if (camera) {
+            const lookAtVector = new THREE.Vector3(0, 0, -1);
+            lookAtVector.applyQuaternion(camera.quaternion);
+            const cameraDirection = new THREE.Vector3();
+            camera.getWorldDirection(cameraDirection);
+            sprite.rotation.z = Math.atan2(cameraDirection.x, cameraDirection.z);
+        }
+        
+        // Store animation ID for potential cancellation
+        animationId = requestAnimationFrame(animate);
+    };
+    
+    animate();
+    
+    // Add a cleanup method to the group
+    group.dispose = function() {
+        if (animationId) {
+            cancelAnimationFrame(animationId);
+        }
+        if (material) {
+            material.dispose();
+        }
+        if (texture) {
+            texture.dispose();
+        }
+    };
+    
+    return group;
+}
+
 // Handle checkpoint collision detection
 function checkCheckpoints() {
     if (!atvMesh || checkpoints.length === 0) return;
@@ -2739,5 +2890,4 @@ function initializeMultiplayer() {
         multiplayerManager.init();
     }
 }
-
 animate();

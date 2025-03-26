@@ -17,10 +17,10 @@ class DriftRaceTrack extends BaseTrack {
         
         // User preferences for which ramps to show
         this.rampVisibility = {
-            north: false,  // red ramp
-            east: false,   // green ramp
+            north: true,  // red ramp
+            east: true,   // green ramp
             south: true,   // blue ramp - only this one should be visible
-            west: false    // yellow ramp
+            west: true    // yellow ramp
         };
     }
     
