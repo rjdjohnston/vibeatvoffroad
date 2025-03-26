@@ -295,7 +295,7 @@ function setupGameStart() {
         localStorage.setItem('vibeatv_username', urlUsername);
         // Auto-start the game after a short delay to ensure everything is loaded
         setTimeout(() => {
-            startGame();
+            startGame(startScreen, usernameInput, controlsInfo, gameHud, mobileControls);
         }, 500);
     } else {
         // Normal flow - check localStorage for previously saved username
@@ -313,152 +313,177 @@ function setupGameStart() {
     // Allow pressing Enter to start the game
     usernameInput.addEventListener('keyup', function(event) {
         if (event.key === 'Enter') {
-            startGame();
+            startGame(startScreen, usernameInput, controlsInfo, gameHud, mobileControls);
         }
     });
     
     // Start button click handler
-    startButton.addEventListener('click', startGame);
+    startButton.addEventListener('click', function() {
+        startGame(startScreen, usernameInput, controlsInfo, gameHud, mobileControls);
+    });
+}
+
+// Game start function with UI elements passed as parameters
+function startGame(startScreen, usernameInput, controlsInfo, gameHud, mobileControls) {
+    playerName = usernameInput.value.trim();
     
-    function startGame() {
-        playerName = usernameInput.value.trim();
+    // Use a default name if none provided
+    if (!playerName) {
+        playerName = 'Player_' + Math.floor(Math.random() * 1000);
+    } else {
+        // Save the username to localStorage for future sessions
+        localStorage.setItem('vibeatv_username', playerName);
+    }
+    
+    // Share the player name with the window object for global access
+    window.playerName = playerName;
+    
+    // Check if this player is the authorized editor
+    isAuthorizedEditor = (playerName === 'RJ_4_America');
+    window.isAuthorizedEditor = isAuthorizedEditor;
+    
+    console.log("Game starting with player name:", playerName);
+    console.log("Editor authorization:", isAuthorizedEditor ? "GRANTED" : "DENIED");
+    
+    // Add a direct edit button for RJ_4_America
+    if (isAuthorizedEditor) {
+        const editButton = document.createElement('button');
+        editButton.textContent = 'TOGGLE CHECKPOINT EDIT';
+        editButton.style.position = 'absolute';
+        editButton.style.top = '10px';
+        editButton.style.right = '10px';
+        editButton.style.padding = '10px';
+        editButton.style.backgroundColor = '#e74c3c';
+        editButton.style.color = 'white';
+        editButton.style.border = 'none';
+        editButton.style.borderRadius = '5px';
+        editButton.style.fontWeight = 'bold';
+        editButton.style.zIndex = '9999';
         
-        // Use a default name if none provided
-        if (!playerName) {
-            playerName = 'Player_' + Math.floor(Math.random() * 1000);
-        } else {
-            // Save the username to localStorage for future sessions
-            localStorage.setItem('vibeatv_username', playerName);
-        }
+        editButton.addEventListener('click', function() {
+            console.log("Edit button clicked");
+            // Make sure controls exist first
+            if (!document.getElementById('checkpoint-controls')) {
+                createCheckpointControls();
+            }
+            toggleEditMode();
+        });
         
-        // Share the player name with the window object for global access
-        window.playerName = playerName;
+        document.body.appendChild(editButton);
         
-        // Check if this player is the authorized editor
-        isAuthorizedEditor = (playerName === 'RJ_4_America');
-        window.isAuthorizedEditor = isAuthorizedEditor;
-        
-        console.log("Game starting with player name:", playerName);
-        console.log("Editor authorization:", isAuthorizedEditor ? "GRANTED" : "DENIED");
-        
-        // Add a direct edit button for RJ_4_America
-        if (isAuthorizedEditor) {
-            const editButton = document.createElement('button');
-            editButton.textContent = 'TOGGLE CHECKPOINT EDIT';
-            editButton.style.position = 'absolute';
-            editButton.style.top = '10px';
-            editButton.style.right = '10px';
-            editButton.style.padding = '10px';
-            editButton.style.backgroundColor = '#e74c3c';
-            editButton.style.color = 'white';
-            editButton.style.border = 'none';
-            editButton.style.borderRadius = '5px';
-            editButton.style.fontWeight = 'bold';
-            editButton.style.zIndex = '9999';
-            
-            editButton.addEventListener('click', function() {
-                console.log("Edit button clicked");
-                // Make sure controls exist first
-                if (!document.getElementById('checkpoint-controls')) {
-                    createCheckpointControls();
-                }
-                toggleEditMode();
-            });
-            
-            document.body.appendChild(editButton);
-            
-            // Make the function available on window right away
-            window.createCheckpointControls = createCheckpointControls;
-            window.toggleEditMode = toggleEditMode;
-            window.showNotification = showNotification;
-        }
-        
-        // Add the global E key handler for checkpoint editing
-        window.addEventListener('keydown', function(event) {
-            if (event.key.toLowerCase() === 'e' && gameStarted) {
-                console.log("E key pressed, authorized:", isAuthorizedEditor);
-                if (isAuthorizedEditor) {
-                    if (window.toggleEditMode) {
-                        window.toggleEditMode();
-                    } else {
-                        console.error("toggleEditMode function not available");
-                    }
+        // Make the function available on window right away
+        window.createCheckpointControls = createCheckpointControls;
+        window.toggleEditMode = toggleEditMode;
+        window.showNotification = showNotification;
+    }
+    
+    // Add the global E key handler for checkpoint editing
+    window.addEventListener('keydown', function(event) {
+        if (event.key.toLowerCase() === 'e' && gameStarted) {
+            console.log("E key pressed, authorized:", isAuthorizedEditor);
+            if (isAuthorizedEditor) {
+                if (window.toggleEditMode) {
+                    window.toggleEditMode();
                 } else {
-                    console.log("Edit mode denied - not RJ_4_America");
-                    if (window.showNotification) {
-                        window.showNotification('Only RJ_4_America can edit checkpoints', true);
-                    }
+                    console.error("toggleEditMode function not available");
+                }
+            } else {
+                console.log("Edit mode denied - not RJ_4_America");
+                if (window.showNotification) {
+                    window.showNotification('Only RJ_4_America can edit checkpoints', true);
                 }
             }
-        });
-        
-        // Hide the start screen
-        startScreen.classList.add('hidden');
-        
-        // Show controls and HUD
-        controlsInfo.classList.remove('hidden');
-        gameHud.classList.remove('hidden');
-        
-        // Show checkpoint UI elements if they exist
-        const checkpointElements = document.querySelectorAll('.checkpoint-ui');
-        console.log("Found checkpoint UI elements:", checkpointElements.length);
-        checkpointElements.forEach(el => {
-            console.log("Showing checkpoint UI element:", el.id);
-            el.classList.remove('hidden');
-        });
-        
-        // Show mobile controls if on a mobile device
-        if (window.isMobileDevice) {
-            mobileControls.classList.remove('hidden');
-            // Hide keyboard controls info on mobile
-            controlsInfo.classList.add('hidden');
-            setupTouchControls();
         }
+    });
+    
+    // Hide the start screen
+    startScreen.classList.add('hidden');
+    
+    // Show controls and HUD
+    controlsInfo.classList.remove('hidden');
+    gameHud.classList.remove('hidden');
+    
+    // Show checkpoint UI elements if they exist
+    const checkpointElements = document.querySelectorAll('.checkpoint-ui');
+    console.log("Found checkpoint UI elements:", checkpointElements.length);
+    checkpointElements.forEach(el => {
+        console.log("Showing checkpoint UI element:", el.id);
+        el.classList.remove('hidden');
+    });
+    
+    // Show mobile controls if on a mobile device
+    if (window.isMobileDevice) {
+        mobileControls.classList.remove('hidden');
+        // Hide keyboard controls info on mobile
+        controlsInfo.classList.add('hidden');
+        setupTouchControls();
+    }
+    
+    // Set game as started
+    gameStarted = true;
+    
+    console.log(`Game started with player name: ${playerName}`);
+    
+    // Show a loading message while the track loads
+    showNotification('Loading track...', false, 5000);
+    
+    // Make sure skybox is visible
+    if (skybox) {
+        skybox.visible = true;
+    }
+    
+    // Initialize ATV physics and track after starting the game
+    Promise.all([
+        loadATVModel(),
+        loadTrack()
+    ])
+    .then(([atv, track]) => {
+        console.log('ATV and track loaded successfully');
         
-        // Set game as started
-        gameStarted = true;
+        // Initialize the ATV physics and make it visible
+        initializeATVAndTrack();
         
-        console.log(`Game started with player name: ${playerName}`);
+        // Initialize multiplayer
+        initializeMultiplayer();
         
-        // Initialize multiplayer if ATV model is already loaded
-        if (atvMesh) {
-            initializeMultiplayer();
-        }
-        
-        // Start game audio
-        if (!audioSystem.isMuted) {
-            // If audio is loaded, play immediately
-            if (audioSystem.loaded) {
-                audioSystem.bgMusic.play().catch(err => console.warn('Error playing background music:', err));
-                audioSystem.engineSound.play().catch(err => console.warn('Error playing engine sound:', err));
-            } else {
-                // Otherwise wait for audio to load
-                console.log('Waiting for audio files to load...');
-                const checkAudioLoaded = setInterval(() => {
-                    if (audioSystem.loaded) {
-                        clearInterval(checkAudioLoaded);
-                        audioSystem.bgMusic.play().catch(err => console.warn('Error playing background music:', err));
-                        audioSystem.engineSound.play().catch(err => console.warn('Error playing engine sound:', err));
-                        console.log('Audio playback started after loading');
-                    }
-                }, 500);
-                
-                // Add a timeout to avoid indefinite waiting
-                setTimeout(() => {
+        // Show success message
+        showNotification('Track loaded - ready to race!', false, 2000);
+    })
+    .catch(error => {
+        console.error('Error loading game assets:', error);
+        showNotification('Error loading game. Please refresh.', true, 5000);
+    });
+    
+    // Start game audio
+    if (!audioSystem.isMuted) {
+        // If audio is loaded, play immediately
+        if (audioSystem.loaded) {
+            audioSystem.bgMusic.play().catch(err => console.warn('Error playing background music:', err));
+            audioSystem.engineSound.play().catch(err => console.warn('Error playing engine sound:', err));
+        } else {
+            // Otherwise wait for audio to load
+            console.log('Waiting for audio files to load...');
+            const checkAudioLoaded = setInterval(() => {
+                if (audioSystem.loaded) {
                     clearInterval(checkAudioLoaded);
-                    // Try to play even if loaded flag isn't set
-                    try {
-                        audioSystem.bgMusic.play().catch(() => {});
-                        audioSystem.engineSound.play().catch(() => {});
-                    } catch (e) {
-                        console.warn('Gave up waiting for audio to load properly');
-                    }
-                }, 5000);
-            }
+                    audioSystem.bgMusic.play().catch(err => console.warn('Error playing background music:', err));
+                    audioSystem.engineSound.play().catch(err => console.warn('Error playing engine sound:', err));
+                    console.log('Audio playback started after loading');
+                }
+            }, 500);
+            
+            // Add a timeout to avoid indefinite waiting
+            setTimeout(() => {
+                clearInterval(checkAudioLoaded);
+                // Try to play even if loaded flag isn't set
+                try {
+                    audioSystem.bgMusic.play().catch(() => {});
+                    audioSystem.engineSound.play().catch(() => {});
+                } catch (e) {
+                    console.warn('Gave up waiting for audio to load properly');
+                }
+            }, 5000);
         }
-        
-        // Load track using our new track loader system
-        loadTrack();
     }
 }
 
@@ -699,6 +724,9 @@ const trackLoader = new TrackLoader({
     }
 });
 
+// Flag to control physics simulation until game starts
+let physicsPaused = true;
+
 // Lighting
 const ambientLight = new THREE.AmbientLight(0xeeeeee);
 scene.add(ambientLight);
@@ -745,422 +773,381 @@ world.addBody(groundBody);
 
 // Load 3D Race Track Model when game starts
 function loadTrack() {
-    // Load the default track (drift race track)
-    trackLoader.loadTrack('drift-race')
+    // Preload the default track (drift race track)
+    return trackLoader.loadTrack('drift-race')
         .then(track => {
             console.log('Successfully loaded track:', track.name);
             trackMesh = track.trackMesh;
             trackCollider = track.trackCollider;
+            return track;
         })
         .catch(error => {
             console.error('Error loading track:', error);
+            throw error;
         });
 }
 
-// Function to create physics for the track - kept for backward compatibility
-function createTrackPhysics(trackModel) {
-    // This function is now handled by the track modules
-    console.log("Track physics now handled by track modules");
+// Create physics objects for ATV
+function createATVPhysics() {
+    // Create a simple ground plane as fallback (positioned much lower as a safety net)
+    const fallbackGroundShape = new CANNON.Plane();
+    const groundBody = new CANNON.Body({ mass: 0, material: groundMaterial });
+    groundBody.addShape(fallbackGroundShape);
+    groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+    groundBody.position.set(0, -20, 0); // Much lower as a final safety net
+    world.addBody(groundBody);
+    
+    // ATV physics
+    // For chassis dimensions (width, height, length)
+    const chassisShape = new CANNON.Box(new CANNON.Vec3(1.5, 0.3, 2.0));  // Much wider and longer, but flatter
+    const chassisBody = new CANNON.Body({ mass: 150, material: vehicleMaterial }); // Higher mass for stability
+    
+    // Lower center of mass by offsetting the shape downward
+    // For center of mass height (more negative = lower center of mass)
+    chassisBody.addShape(chassisShape, new CANNON.Vec3(0, -0.1, 0)); // Slight offset for center of mass
+    chassisBody.position.set(20, 5, 20);
+    chassisBody.velocity.set(0, 0, 0);
+    chassisBody.angularVelocity.set(0, 0, 0);
+    chassisBody.quaternion.set(0, 0, 0, 1);
+    chassisBody.linearDamping = 0.7; // Less linear damping for smoother movement
+    chassisBody.angularDamping = 0.02;  // Reduced to allow some tilting while still providing stability
+    world.addBody(chassisBody);
+    
+    // Wheels physics
+    const wheelShape = new CANNON.Sphere(0.5);
+    const wheelBodies = [];
+    const wheelConstraints = [];
+    const wheelPositions = [
+        new CANNON.Vec3(-1.7, -0.4, -1.8), // Front left - wider and further forward
+        new CANNON.Vec3(1.7, -0.4, -1.8),  // Front right - wider and further forward
+        new CANNON.Vec3(-1.7, -0.4, 1.8),  // Rear left - wider and further back
+        new CANNON.Vec3(1.7, -0.4, 1.8)    // Rear right - wider and further back
+    ];
+    
+    wheelPositions.forEach((pos, index) => {
+        const wheelBody = new CANNON.Body({ mass: 2, material: vehicleMaterial });
+        wheelBody.addShape(wheelShape);
+        wheelBody.position.copy(chassisBody.position).vadd(pos);
+        wheelBody.velocity.set(0, 0, 0);
+        wheelBody.angularVelocity.set(0, 0, 0);
+        world.addBody(wheelBody);
+        wheelBodies.push(wheelBody);
+    
+        const constraint = new CANNON.HingeConstraint(chassisBody, wheelBody, {
+            pivotA: pos,
+            pivotB: new CANNON.Vec3(0, 0, 0),
+            axisA: new CANNON.Vec3(1, 0, 0),
+            axisB: new CANNON.Vec3(1, 0, 0),
+            maxForce: 1e6
+        });
+        world.addConstraint(constraint);
+        wheelConstraints.push(constraint);
+    });
+    
+    // Store wheels in global scope for later access
+    window.wheelBodies = wheelBodies;
+    window.wheelConstraints = wheelConstraints;
+    
+    return chassisBody;
 }
 
-// ATV physics
-// For chassis dimensions (width, height, length)
-const chassisShape = new CANNON.Box(new CANNON.Vec3(1.5, 0.3, 2.0));  // Much wider and longer, but flatter
-const chassisBody = new CANNON.Body({ mass: 150, material: vehicleMaterial }); // Higher mass for stability
-// Lower center of mass by offsetting the shape downward
-// For center of mass height (more negative = lower center of mass)
-chassisBody.addShape(chassisShape, new CANNON.Vec3(0, -0.1, 0)); // Slight offset for center of mass
-chassisBody.position.set(20, 5, 20);
-chassisBody.velocity.set(0, 0, 0);
-chassisBody.angularVelocity.set(0, 0, 0);
-chassisBody.quaternion.set(0, 0, 0, 1);
-chassisBody.linearDamping = 0.7; // Less linear damping for smoother movement
-chassisBody.angularDamping = 0.02;  // Reduced to allow some tilting while still providing stability
-world.addBody(chassisBody);
+let chassisBody = null;
+let atvMesh = null;
+let wheelsInitialized = false;
 
-// Wheels physics
-const wheelShape = new CANNON.Sphere(0.5);
-const wheelBodies = [];
-const wheelConstraints = [];
-const wheelPositions = [
-    new CANNON.Vec3(-1.7, -0.4, -1.8), // Front left - wider and further forward
-    new CANNON.Vec3(1.7, -0.4, -1.8),  // Front right - wider and further forward
-    new CANNON.Vec3(-1.7, -0.4, 1.8),  // Rear left - wider and further back
-    new CANNON.Vec3(1.7, -0.4, 1.8)    // Rear right - wider and further back
-];
-
-wheelPositions.forEach((pos, index) => {
-    const wheelBody = new CANNON.Body({ mass: 2, material: vehicleMaterial });
-    wheelBody.addShape(wheelShape);
-    wheelBody.position.copy(chassisBody.position).vadd(pos);
-    wheelBody.velocity.set(0, 0, 0);
-    wheelBody.angularVelocity.set(0, 0, 0);
-    world.addBody(wheelBody);
-    wheelBodies.push(wheelBody);
-
-    const constraint = new CANNON.HingeConstraint(chassisBody, wheelBody, {
-        pivotA: pos,
-        pivotB: new CANNON.Vec3(0, 0, 0),
-        axisA: new CANNON.Vec3(1, 0, 0),
-        axisB: new CANNON.Vec3(1, 0, 0),
-        maxForce: 1e6
+// Load ATV Model
+function loadATVModel() {
+    return new Promise((resolve, reject) => {
+        gltfLoader.load(
+            'models/atv/scene.gltf',
+            (gltf) => {
+                atvMesh = gltf.scene;
+                
+                // Scale the model but don't add to scene yet
+                atvMesh.scale.set(0.1, 0.1, 0.1);
+                
+                // Hide the ATV until game starts
+                atvMesh.visible = false;
+                
+                // Add to scene after configuring
+                scene.add(atvMesh);
+                
+                resolve(atvMesh);
+            },
+            (progress) => console.log('Loading ATV:', progress.loaded / progress.total * 100 + '%'),
+            (error) => {
+                console.error('ATV loading failed:', error);
+                reject(error);
+            }
+        );
     });
-    world.addConstraint(constraint);
-    wheelConstraints.push(constraint);
-});
+}
 
-// Step physics once to settle ATV
-world.step(1 / 60);
-
-// Load ATV model
-let atvMesh;
-gltfLoader.load(
-    'models/atv/scene.gltf',
-    (gltf) => {
-        atvMesh = gltf.scene;
-        
-        // Scale and position the model to match the physics body
-        atvMesh.scale.set(0.1, 0.1, 0.1);
-        scene.add(atvMesh);
-        
-        // Position will be updated in the animation loop
+// Initialize everything
+function initializeATVAndTrack() {
+    // Create physics for the ATV
+    chassisBody = createATVPhysics();
+    
+    // Position the ATV mesh to match the physics body
+    if (atvMesh) {
+        atvMesh.visible = true;
         atvMesh.position.copy(chassisBody.position);
         atvMesh.position.y += 1.7;
         atvMesh.quaternion.copy(chassisBody.quaternion);
-        
-        // console.log('ATV loaded successfully');
-        
-        // Initialize multiplayer after ATV is loaded
-        if (gameStarted) {
-            initializeMultiplayer();
-        }
-    },
-    (progress) => console.log('Loading ATV:', progress.loaded / progress.total * 100 + '%'),
-    (error) => console.error('ATV loading failed:', error)
-);
-
-// Initialize multiplayer
-function initializeMultiplayer() {
-    if (!multiplayerManager && atvMesh && gameStarted) {
-        // console.log("Initializing multiplayer with player name:", playerName);
-        multiplayerManager = new MultiplayerManager(scene, chassisBody, atvMesh, playerName);
-        multiplayerManager.init();
+    }
+    
+    // Resume physics simulation
+    physicsPaused = false;
+    
+    // Initialize multiplayer
+    if (gameStarted) {
+        initializeMultiplayer();
     }
 }
 
-// Load and place survival assets
-gltfLoader.load(
-    'assets/survival/scene.gltf',
-    (gltf) => {
-        // console.log('Survival GLTF loaded:', gltf);
-        const assets = gltf.scene;
-
-        const tireMesh = assets.getObjectByName('opon_Material002_0');
-        const barrelMesh = assets.getObjectByName('Cylinder003_Material003_0');
-        const cubeMesh = assets.getObjectByName('Cube057_DefaultMaterial_0');
-
-        if (!tireMesh || !barrelMesh || !cubeMesh) {
-            console.error('One or more meshes not found:', { tireMesh, barrelMesh, cubeMesh });
-            return;
-        }
-
-        assets.traverse((node) => {
-            if (node.isMesh && node.material) {
-                node.material.emissive = new THREE.Color(0x202020);
-                node.material.emissiveIntensity = 0.5;
-                // console.log(`Material for ${node.name}:`, node.material);
-            }
-        });
-
-        for (let i = 0; i < 10; i++) {
-            const tireClone = tireMesh.clone();
-            tireClone.position.set((Math.random() - 0.5) * 600, 0, (Math.random() - 0.5) * 600);
-            tireClone.scale.set(5, 5, 5);
-            if (Math.abs(tireClone.position.x) > 250 || Math.abs(tireClone.position.z) > 250) {
-                scene.add(tireClone);
-                const tireBody = new CANNON.Body({ mass: 0, material: assetMaterial });
-                tireBody.addShape(new CANNON.Box(new CANNON.Vec3(0.37, 0.37, 0.16)));
-                tireBody.position.copy(tireClone.position);
-                world.addBody(tireBody);
-                // console.log('Tire placed at:', tireClone.position);
-            }
-
-            const barrelClone = barrelMesh.clone();
-            barrelClone.position.set((Math.random() - 0.5) * 600, 0, (Math.random() - 0.5) * 600);
-            barrelClone.scale.set(5, 5, 5);
-            if (Math.abs(barrelClone.position.x) > 250 || Math.abs(barrelClone.position.z) > 250) {
-                scene.add(barrelClone);
-                const barrelBody = new CANNON.Body({ mass: 0, material: assetMaterial });
-                barrelBody.addShape(new CANNON.Box(new CANNON.Vec3(0.27, 0.27, 0.44)));
-                barrelBody.position.copy(barrelClone.position);
-                world.addBody(barrelBody);
-                // console.log('Barrel placed at:', barrelClone.position);
-            }
-        }
-
-        for (let i = 0; i < 5; i++) {
-            const barrelClone = barrelMesh.clone();
-            barrelClone.position.set((Math.random() - 0.5) * 300, 0, (Math.random() - 0.5) * 300);
-            barrelClone.scale.set(5, 5, 5);
-            const distX = Math.abs(barrelClone.position.x);
-            const distZ = Math.abs(barrelClone.position.z);
-            if ((distX > 125 && distX < 250) || (distZ > 125 && distZ < 250)) {
-                scene.add(barrelClone);
-                const barrelBody = new CANNON.Body({ mass: 0, material: assetMaterial });
-                barrelBody.addShape(new CANNON.Box(new CANNON.Vec3(0.27, 0.27, 0.44)));
-                barrelBody.position.copy(barrelClone.position);
-                world.addBody(barrelBody);
-                // console.log('Extra barrel placed near track at:', barrelClone.position);
-            }
-        }
-
-        const trackAssets = [
-            { mesh: tireMesh, pos: new THREE.Vector3(210, 0.1, 100), size: new CANNON.Vec3(0.37, 0.37, 0.16) },
-            { mesh: barrelMesh, pos: new THREE.Vector3(250, 0.1, -100), size: new CANNON.Vec3(0.27, 0.27, 0.44) },
-            { mesh: cubeMesh, pos: new THREE.Vector3(-230, 0.1, 50), size: new CANNON.Vec3(1.99, 0.79, 0.78) }
-        ];
-        trackAssets.forEach(asset => {
-            const clone = asset.mesh.clone();
-            clone.position.copy(asset.pos);
-            clone.scale.set(5, 5, 5);
-            scene.add(clone);
-            const body = new CANNON.Body({ mass: 0, material: assetMaterial });
-            body.addShape(new CANNON.Box(asset.size));
-            body.position.copy(clone.position);
-            world.addBody(body);
-            // console.log(`${asset.mesh.name} placed on track at:`, clone.position);
-        });
-
-        // console.log('Survival assets loaded and placed');
-    },
-    (progress) => console.log('Loading survival assets:', progress.loaded / progress.total * 100 + '%'),
-    (error) => console.error('Survival assets loading failed:', error)
-);
-
-// Dust particles
-const particleGeometry = new THREE.BufferGeometry();
-const particleCount = 200;
-const posArray = new Float32Array(particleCount * 3);
-for (let i = 0; i < particleCount * 3; i++) posArray[i] = 0;
-particleGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-const particleMaterial = new THREE.PointsMaterial({ color: 0x654321, size: 0.2, transparent: true, opacity: 0.8 });
-const dustParticles = new THREE.Points(particleGeometry, particleMaterial);
-scene.add(dustParticles);
-
-// Speedometer UI
-const speedometer = document.createElement('div');
-speedometer.style.position = 'absolute';
-speedometer.style.top = '10px';
-speedometer.style.left = '10px';
-speedometer.style.color = 'white';
-speedometer.style.fontSize = '20px';
-speedometer.style.background = 'rgba(0, 0, 0, 0.5)';
-speedometer.style.padding = '5px';
-document.body.appendChild(speedometer);
-
-// Camera setup
-camera.position.set(0, 10, -30);
-camera.lookAt(0, 0, 0);
-
 // Animation loop
-let settled = false;
-let clock = new THREE.Clock();
 function animate() {
     requestAnimationFrame(animate);
     vibeVerse();
-    world.step(1 / 60);
-
-    const speed = 2000; // Reduced speed
-    // For turning sensitivity (lower = more stable turns)
-    const turnSpeed = 1.25; // Reduced from 1.5 for more stable turning
-    const localDirection = new CANNON.Vec3(0, 0, -1);
-    const worldDirection = chassisBody.quaternion.vmult(localDirection);
-    worldDirection.y = 0;
-    worldDirection.normalize();
-
-    // Get current velocity for lean calculations
-    const currentVelocity = chassisBody.velocity.length();
     
-    // Simplify force application - apply directly to center of mass
-    if (controls.forward) {
-        chassisBody.applyForce(worldDirection.scale(-speed * 5), chassisBody.position);
-    } else if (controls.backward) {
-        chassisBody.applyForce(worldDirection.scale(speed * 3), chassisBody.position); // Less power for reverse
-    }
+    // Only step physics when not paused
+    if (!physicsPaused) {
+        world.step(1 / 60);
+        
+        const speed = 2000; // Balanced speed value
+        const turnSpeed = 1.2; // Standard turning speed
+        const localDirection = new CANNON.Vec3(0, 0, -1);
+        const worldDirection = chassisBody.quaternion.vmult(localDirection);
+        worldDirection.y = 0;
+        worldDirection.normalize();
 
-    if (controls.left) {
-        // Add leaning effect when turning left at speed
-        if (currentVelocity > 5) {
-            // Create a force that pushes the ATV to lean into the turn
-            const leanDirection = new CANNON.Vec3(-1, 0, 0); // Left lean
-            const worldLeanDir = chassisBody.quaternion.vmult(leanDirection);
-            worldLeanDir.y = 0;
-            worldLeanDir.normalize();
-            // Apply lean force - stronger at higher speeds
-            const leanFactor = Math.min(currentVelocity * 25, 500);
-            chassisBody.applyForce(worldLeanDir.scale(leanFactor), chassisBody.position);
+        // Get current velocity for lean calculations
+        const currentVelocity = chassisBody.velocity.length();
+        
+        // Apply wheel turning and movement forces
+        if (controls.forward) {
+            // Apply forward force - negative because of the direction vector
+            const forwardForce = -speed * 5;
+            chassisBody.applyForce(worldDirection.scale(forwardForce), chassisBody.position);
+            
+            // Spin the wheels forward
+            if (window.wheelBodies) {
+                window.wheelBodies.forEach(wheel => {
+                    // Get the axis for this wheel in world space
+                    const wheelAxis = new CANNON.Vec3(1, 0, 0); // Local x-axis
+                    const worldAxis = chassisBody.quaternion.vmult(wheelAxis);
+                    // Apply torque to wheel based on speed
+                    wheel.angularVelocity.set(
+                        worldAxis.x * -speed * 0.05,
+                        worldAxis.y * -speed * 0.05,
+                        worldAxis.z * -speed * 0.05
+                    );
+                });
+            }
+        } else if (controls.backward) {
+            // Apply backward force
+            const backwardForce = speed * 3;
+            chassisBody.applyForce(worldDirection.scale(backwardForce), chassisBody.position);
+            
+            // Spin the wheels backward
+            if (window.wheelBodies) {
+                window.wheelBodies.forEach(wheel => {
+                    // Get the axis for this wheel in world space
+                    const wheelAxis = new CANNON.Vec3(1, 0, 0); // Local x-axis
+                    const worldAxis = chassisBody.quaternion.vmult(wheelAxis);
+                    // Apply torque to wheel based on speed
+                    wheel.angularVelocity.set(
+                        worldAxis.x * speed * 0.03,
+                        worldAxis.y * speed * 0.03,
+                        worldAxis.z * speed * 0.03
+                    );
+                });
+            }
+        } else {
+            // Apply some friction to wheels when not accelerating
+            if (window.wheelBodies) {
+                window.wheelBodies.forEach(wheel => {
+                    wheel.angularVelocity.scale(0.95, wheel.angularVelocity);
+                });
+            }
         }
-        chassisBody.angularVelocity.y = turnSpeed;
-    } else if (controls.right) {
-        // Add leaning effect when turning right at speed
-        if (currentVelocity > 5) {
-            // Create a force that pushes the ATV to lean into the turn
-            const leanDirection = new CANNON.Vec3(1, 0, 0); // Right lean
-            const worldLeanDir = chassisBody.quaternion.vmult(leanDirection);
-            worldLeanDir.y = 0;
-            worldLeanDir.normalize();
-            // Apply lean force - stronger at higher speeds
-            const leanFactor = Math.min(currentVelocity * 0.5, 500);
-            chassisBody.applyForce(worldLeanDir.scale(leanFactor), chassisBody.position);
+
+        // Handle turning
+        if (controls.left) {
+            // Add leaning effect when turning left at speed
+            if (currentVelocity > 5) {
+                // Create a force that pushes the ATV to lean into the turn
+                const leanDirection = new CANNON.Vec3(-1, 0, 0); // Left lean
+                const worldLeanDir = chassisBody.quaternion.vmult(leanDirection);
+                worldLeanDir.y = 0;
+                worldLeanDir.normalize();
+                // Apply lean force - stronger at higher speeds
+                const leanFactor = Math.min(currentVelocity * 15, 500);
+                chassisBody.applyForce(worldLeanDir.scale(leanFactor), chassisBody.position);
+            }
+            chassisBody.angularVelocity.y = turnSpeed;
+        } else if (controls.right) {
+            // Add leaning effect when turning right at speed
+            if (currentVelocity > 5) {
+                // Create a force that pushes the ATV to lean into the turn
+                const leanDirection = new CANNON.Vec3(1, 0, 0); // Right lean
+                const worldLeanDir = chassisBody.quaternion.vmult(leanDirection);
+                worldLeanDir.y = 0;
+                worldLeanDir.normalize();
+                // Apply lean force - stronger at higher speeds
+                const leanFactor = Math.min(currentVelocity * 15, 500);
+                chassisBody.applyForce(worldLeanDir.scale(leanFactor), chassisBody.position);
+            }
+            chassisBody.angularVelocity.y = -turnSpeed;
+        } else {
+            chassisBody.angularVelocity.y *= 0.9;
         }
-        chassisBody.angularVelocity.y = -turnSpeed;
-    } else {
-        chassisBody.angularVelocity.y *= 0.9;
-    }
 
-    if (chassisBody.position.y <= 0.9 && !settled) {
-        settled = true;
-        chassisBody.linearDamping = 0.5;
-        chassisBody.angularDamping = 0.5;
-    }
+        // Handling vehicle settling on ground
+        if (chassisBody.position.y <= 0.9 && !settled) {
+            settled = true;
+            chassisBody.linearDamping = 0.5;
+            chassisBody.angularDamping = 0.5;
+        }
 
-    const maxAngular = 5;
-    chassisBody.angularVelocity.x = Math.max(-maxAngular, Math.min(maxAngular, chassisBody.angularVelocity.x));
-    chassisBody.angularVelocity.y = Math.max(-maxAngular, Math.min(maxAngular, chassisBody.angularVelocity.y));
-    chassisBody.angularVelocity.z = Math.max(-maxAngular, Math.min(maxAngular, chassisBody.angularVelocity.z));
+        const maxAngular = 5;
+        chassisBody.angularVelocity.x = Math.max(-maxAngular, Math.min(maxAngular, chassisBody.angularVelocity.x));
+        chassisBody.angularVelocity.y = Math.max(-maxAngular, Math.min(maxAngular, chassisBody.angularVelocity.y));
+        chassisBody.angularVelocity.z = Math.max(-maxAngular, Math.min(maxAngular, chassisBody.angularVelocity.z));
 
-    if (atvMesh) {
-        atvMesh.position.copy(chassisBody.position);
-        atvMesh.position.y += 1.7;
-        atvMesh.quaternion.copy(chassisBody.quaternion);
+        if (atvMesh) {
+            atvMesh.position.copy(chassisBody.position);
+            atvMesh.position.y += 1.7;
+            atvMesh.quaternion.copy(chassisBody.quaternion);
 
-        // Dust particles
-        const velocityMagnitude = Math.sqrt(chassisBody.velocity.x ** 2 + chassisBody.velocity.z ** 2);
-        const positions = dustParticles.geometry.attributes.position.array;
-        if (velocityMagnitude > 0.5) {
-            for (let i = 0; i < particleCount; i++) {
-                const idx = i * 3;
-                if (positions[idx + 1] < -0.4 || Math.random() < 0.2) {
-                    positions[idx] = atvMesh.position.x + (Math.random() - 0.5) * 4;
-                    positions[idx + 1] = 0 + Math.random() * 0.4;
-                    positions[idx + 2] = atvMesh.position.z + (Math.random() - 0.5) * 1;
-                } else {
-                    positions[idx + 1] -= 0.05;
-                    positions[idx] += (Math.random() - 0.5) * 0.1;
-                    positions[idx + 2] += (Math.random() - 0.5) * 0.1;
+            // Dust particles
+            const velocityMagnitude = Math.sqrt(chassisBody.velocity.x ** 2 + chassisBody.velocity.z ** 2);
+            const positions = dustParticles.geometry.attributes.position.array;
+            if (velocityMagnitude > 0.5) {
+                for (let i = 0; i < particleCount; i++) {
+                    const idx = i * 3;
+                    if (positions[idx + 1] < -0.4 || Math.random() < 0.2) {
+                        positions[idx] = atvMesh.position.x + (Math.random() - 0.5) * 4;
+                        positions[idx + 1] = 0 + Math.random() * 0.4;
+                        positions[idx + 2] = atvMesh.position.z + (Math.random() - 0.5) * 1;
+                    } else {
+                        positions[idx + 1] -= 0.05;
+                        positions[idx] += (Math.random() - 0.5) * 0.1;
+                        positions[idx + 2] += (Math.random() - 0.5) * 0.1;
+                    }
+                }
+            } else {
+                for (let i = 0; i < particleCount * 3; i += 3) {
+                    positions[i + 1] -= 0.1;
+                    if (positions[i + 1] < -0.4) positions[i + 1] = -0.4;
                 }
             }
-        } else {
-            for (let i = 0; i < particleCount * 3; i += 3) {
-                positions[i + 1] -= 0.1;
-                if (positions[i + 1] < -0.4) positions[i + 1] = -0.4;
+            dustParticles.geometry.attributes.position.needsUpdate = true;
+
+            const speedDisplay = (velocityMagnitude * 3.6).toFixed(1);
+            // speedometer.textContent = `Speed: ${speedDisplay} km/h`;
+
+            const cameraOffset = new THREE.Vector3(0, 5, -10);
+            const atvPosition = new THREE.Vector3().copy(atvMesh.position);
+            const atvQuaternion = new THREE.Quaternion().copy(atvMesh.quaternion);
+            cameraOffset.applyQuaternion(atvQuaternion);
+            const targetCameraPosition = atvPosition.add(cameraOffset);
+            camera.position.lerp(targetCameraPosition, 0.05);
+            camera.lookAt(atvMesh.position);
+
+            if (skybox) {
+                skybox.position.copy(camera.position);
             }
+            
+            updateHUD();
         }
-        dustParticles.geometry.attributes.position.needsUpdate = true;
 
-        const speedDisplay = (velocityMagnitude * 3.6).toFixed(1);
-        // speedometer.textContent = `Speed: ${speedDisplay} km/h`;
-
-        const cameraOffset = new THREE.Vector3(0, 5, -10);
-        const atvPosition = new THREE.Vector3().copy(atvMesh.position);
-        const atvQuaternion = new THREE.Quaternion().copy(atvMesh.quaternion);
-        cameraOffset.applyQuaternion(atvQuaternion);
-        const targetCameraPosition = atvPosition.add(cameraOffset);
-        camera.position.lerp(targetCameraPosition, 0.05);
-        camera.lookAt(atvMesh.position);
-
-        if (skybox) {
-            skybox.position.copy(camera.position);
+        if (chassisBody.position.y < -25 || chassisBody.position.y > 50) {
+            // If the ATV falls through or flies off, reset it
+            chassisBody.position.set(20, 10, 20);
+            chassisBody.velocity.set(0, 0, 0);
+            chassisBody.angularVelocity.set(0, 0, 0);
+            chassisBody.quaternion.set(0, 0, 0, 1);
+            settled = false;
+            chassisBody.linearDamping = 0.9;
+            chassisBody.angularDamping = 0.9;
+            // console.log('ATV reset to starting position');
         }
         
-        updateHUD();
-    }
-
-    if (chassisBody.position.y < -25 || chassisBody.position.y > 50) {
-        // If the ATV falls through or flies off, reset it
-        chassisBody.position.set(20, 10, 20);
-        chassisBody.velocity.set(0, 0, 0);
-        chassisBody.angularVelocity.set(0, 0, 0);
-        chassisBody.quaternion.set(0, 0, 0, 1);
-        settled = false;
-        chassisBody.linearDamping = 0.9;
-        chassisBody.angularDamping = 0.9;
-        // console.log('ATV reset to starting position');
-    }
-    
-    // Check if ATV is flipped upside down
-    if (chassisBody) {
-        // Get the up vector in world space
-        const localUpVector = new CANNON.Vec3(0, 1, 0);
-        const worldUpVector = chassisBody.quaternion.vmult(localUpVector);
-        
-        // Calculate the dot product with the world up vector (0, 1, 0)
-        // If this is negative, the ATV is more upside down than right side up
-        const dotProduct = worldUpVector.dot(new CANNON.Vec3(0, 1, 0));
-        
-        if (dotProduct < -0.5) { // -0.5 threshold indicates significantly upside down
-            if (!isFlipped) {
-                // ATV just flipped
-                isFlipped = true;
-                flipStartTime = Date.now();
-                console.log('ATV flipped upside down');
-            } else if (Date.now() - flipStartTime > flipTimeout) {
-                // ATV has been flipped for over 3 seconds - respawn at same position
-                const currentPosition = chassisBody.position.clone();
-                
-                // Keep the X and Z position, but reset Y to be slightly above the ground
-                // Also reset orientation and velocities
-                chassisBody.position.set(currentPosition.x, 5, currentPosition.z);
-                chassisBody.velocity.set(0, 0, 0);
-                chassisBody.angularVelocity.set(0, 0, 0);
-                chassisBody.quaternion.set(0, 0, 0, 1);
-                
-                // Reset flip detection
+        // Check if ATV is flipped upside down
+        if (chassisBody) {
+            // Get the up vector in world space
+            const localUpVector = new CANNON.Vec3(0, 1, 0);
+            const worldUpVector = chassisBody.quaternion.vmult(localUpVector);
+            
+            // Calculate the dot product with the world up vector (0, 1, 0)
+            // If this is negative, the ATV is more upside down than right side up
+            const dotProduct = worldUpVector.dot(new CANNON.Vec3(0, 1, 0));
+            
+            if (dotProduct < -0.5) { // -0.5 threshold indicates significantly upside down
+                if (!isFlipped) {
+                    // ATV just flipped
+                    isFlipped = true;
+                    flipStartTime = Date.now();
+                    console.log('ATV flipped upside down');
+                } else if (Date.now() - flipStartTime > flipTimeout) {
+                    // ATV has been flipped for over 3 seconds - respawn at same position
+                    const currentPosition = chassisBody.position.clone();
+                    
+                    // Keep the X and Z position, but reset Y to be slightly above the ground
+                    // Also reset orientation and velocities
+                    chassisBody.position.set(currentPosition.x, 5, currentPosition.z);
+                    chassisBody.velocity.set(0, 0, 0);
+                    chassisBody.angularVelocity.set(0, 0, 0);
+                    chassisBody.quaternion.set(0, 0, 0, 1);
+                    
+                    // Reset flip detection
+                    isFlipped = false;
+                    console.log('ATV auto-respawned due to being upside down');
+                    
+                    // Add a visible message about the respawn
+                    showRespawnMessage();
+                }
+            } else {
+                // ATV is not flipped
                 isFlipped = false;
-                console.log('ATV auto-respawned due to being upside down');
-                
-                // Add a visible message about the respawn
-                showRespawnMessage();
             }
-        } else {
-            // ATV is not flipped
-            isFlipped = false;
         }
-    }
 
-    renderer.render(scene, camera);
-    
-    // Update multiplayer
-    if (multiplayerManager) {
-        multiplayerManager.update();
-        updatePlayerListUI();
-    }
+        renderer.render(scene, camera);
+        
+        // Update multiplayer
+        if (multiplayerManager) {
+            multiplayerManager.update();
+            updatePlayerListUI();
+        }
 
-    // Get velocity for HUD
-    const velocity = velocityFromChassis(new THREE.Vector3());
-    const velocityMagnitude = velocity.length();
-    
-    // Update engine sound
-    updateEngineSound(velocityMagnitude * 3.6); // Convert to km/h
-    
-    // Handle jumps and landings for sound effects - only if chassis is ready
-    if (chassisBody && atvMesh) {
-        handleJumpSounds();
-    }
-    
-    // Check for checkpoint collisions
-    checkCheckpoints();
-    
-    // Update lap timer every frame if timing is active
-    if (lastCheckpointTime > 0) {
-        const currentTime = performance.now();
-        currentLapTime = (currentTime - lastCheckpointTime) / 1000;
-        updateCheckpointUI();
-    }
+        // Get velocity for HUD
+        const velocity = velocityFromChassis(new THREE.Vector3());
+        const velocityMagnitude = velocity.length();
+        
+        // Update engine sound
+        updateEngineSound(velocityMagnitude * 3.6); // Convert to km/h
+        
+        // Handle jumps and landings for sound effects - only if chassis is ready
+        if (chassisBody && atvMesh) {
+            handleJumpSounds();
+        }
+        
+        // Check for checkpoint collisions
+        checkCheckpoints();
+        
+        // Update lap timer every frame if timing is active
+        if (lastCheckpointTime > 0) {
+            const currentTime = performance.now();
+            currentLapTime = (currentTime - lastCheckpointTime) / 1000;
+            updateCheckpointUI();
+        }
 
-    // If game has started, show checkpoint controls (only for authorized editor)
-    if (gameStarted && document.getElementById('checkpoint-controls') && isAuthorizedEditor) {
-        document.getElementById('checkpoint-controls').style.display = 'block';
+        // If game has started, show checkpoint controls (only for authorized editor)
+        if (gameStarted && document.getElementById('checkpoint-controls') && isAuthorizedEditor) {
+            document.getElementById('checkpoint-controls').style.display = 'block';
+        }
     }
 }
 animate();
@@ -1823,6 +1810,9 @@ function createCheckpointControls() {
     editButton.style.color = 'white';
     editButton.style.border = 'none';
     editButton.style.cursor = 'pointer';
+    
+    editButton.addEventListener('click', toggleEditMode);
+    
     controlsDiv.appendChild(editButton);
     
     // Save positions button
@@ -1919,7 +1909,10 @@ function createCheckpointControls() {
             if (isAuthorizedEditor) {
                 toggleEditMode();
             } else {
-                showNotification('Only RJ_4_America can edit checkpoints', true);
+                console.log("Edit mode denied - not RJ_4_America");
+                if (window.showNotification) {
+                    window.showNotification('Only RJ_4_America can edit checkpoints', true);
+                }
             }
         }
     });
@@ -2360,105 +2353,6 @@ function createCheckpoint(x, y, z, index) {
     };
 }
 
-// Create a number label for the checkpoint
-function createCheckpointNumber(x, y, z, index) {
-    // Create a floating number above the checkpoint
-    const group = new THREE.Group();
-    group.position.set(x, y + 15, z);
-    
-    // Create text texture
-    const canvas = document.createElement('canvas');
-    canvas.width = 128;
-    canvas.height = 128;
-    const ctx = canvas.getContext('2d');
-    
-    // Clear background
-    ctx.fillStyle = 'rgba(0, 0, 0, 0)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // Draw circle border
-    ctx.beginPath();
-    ctx.arc(64, 64, 60, 0, Math.PI * 2);
-    ctx.lineWidth = 6;
-    
-    // Color based on checkpoint index
-    if (index === 0) {
-        ctx.strokeStyle = '#4CAF50'; // Green
-        ctx.fillStyle = 'rgba(76, 175, 80, 0.3)'; // Semi-transparent green
-    } else if (index === 1) {
-        ctx.strokeStyle = '#2196F3'; // Blue
-        ctx.fillStyle = 'rgba(33, 150, 243, 0.3)'; // Semi-transparent blue
-    } else if (index === 2) {
-        ctx.strokeStyle = '#FF9800'; // Orange
-        ctx.fillStyle = 'rgba(255, 152, 0, 0.3)'; // Semi-transparent orange
-    } else {
-        ctx.strokeStyle = '#9C27B0'; // Purple
-        ctx.fillStyle = 'rgba(156, 39, 176, 0.3)'; // Semi-transparent purple
-    }
-    
-    ctx.fill();
-    ctx.stroke();
-    
-    // Draw number
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 80px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    
-    // Show the checkpoint number (start/finish is 0, display as "S")
-    const displayText = index === 0 ? 'S' : index.toString();
-    ctx.fillText(displayText, 64, 64);
-    
-    const texture = new THREE.CanvasTexture(canvas);
-    const material = new THREE.SpriteMaterial({ 
-        map: texture,
-        transparent: true,
-        depthTest: false // Make sure it's always visible
-    });
-    
-    const sprite = new THREE.Sprite(material);
-    sprite.scale.set(10, 10, 1);
-    group.add(sprite);
-    
-    // Animation ID to allow for cleanup
-    let animationId;
-    
-    // Add animation effect to make the number float up and down
-    const animate = function() {
-        // Small float up and down motion
-        group.position.y = y + 15 + Math.sin(Date.now() * 0.001) * 2;
-        
-        // Rotate to face the camera
-        if (camera) {
-            const lookAtVector = new THREE.Vector3(0, 0, -1);
-            lookAtVector.applyQuaternion(camera.quaternion);
-            const cameraDirection = new THREE.Vector3();
-            camera.getWorldDirection(cameraDirection);
-            sprite.rotation.z = Math.atan2(cameraDirection.x, cameraDirection.z);
-        }
-        
-        // Store animation ID for potential cancellation
-        animationId = requestAnimationFrame(animate);
-    };
-    
-    animate();
-    
-    // Add a cleanup method to the group
-    group.dispose = function() {
-        if (animationId) {
-            cancelAnimationFrame(animationId);
-        }
-        if (material) {
-            material.dispose();
-        }
-        if (texture) {
-            texture.dispose();
-        }
-    };
-    
-    return group;
-}
-
 // Create an arrow helper for moving checkpoints
 function createArrowHelper(x, y, z, color) {
     const arrowGroup = new THREE.Group();
@@ -2807,3 +2701,43 @@ function updateCheckpointUI() {
         }
     });
 }
+
+// Dust particles
+const particleGeometry = new THREE.BufferGeometry();
+const particleCount = 200;
+const posArray = new Float32Array(particleCount * 3);
+for (let i = 0; i < particleCount * 3; i++) posArray[i] = 0;
+particleGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+const particleMaterial = new THREE.PointsMaterial({ color: 0x654321, size: 0.2, transparent: true, opacity: 0.8 });
+const dustParticles = new THREE.Points(particleGeometry, particleMaterial);
+scene.add(dustParticles);
+
+// Speedometer UI
+const speedometer = document.createElement('div');
+speedometer.style.position = 'absolute';
+speedometer.style.top = '10px';
+speedometer.style.left = '10px';
+speedometer.style.color = 'white';
+speedometer.style.fontSize = '20px';
+speedometer.style.background = 'rgba(0, 0, 0, 0.5)';
+speedometer.style.padding = '5px';
+document.body.appendChild(speedometer);
+
+// Camera setup
+camera.position.set(0, 10, -30);
+camera.lookAt(0, 0, 0);
+
+// Track physics settling
+let settled = false;
+let clock = new THREE.Clock();
+
+// Initialize multiplayer
+function initializeMultiplayer() {
+    if (!multiplayerManager && atvMesh && gameStarted) {
+        console.log("Initializing multiplayer with player name:", playerName);
+        multiplayerManager = new MultiplayerManager(scene, chassisBody, atvMesh, playerName);
+        multiplayerManager.init();
+    }
+}
+
+animate();
