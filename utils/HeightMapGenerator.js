@@ -233,66 +233,67 @@ class HeightMapGenerator {
     }
     
     /**
-     * Create a CANNON.js heightfield from a height map
-     * @param {Object} heightMap - The height map data
-     * @param {CANNON.World} world - The physics world to add the heightfield to
-     * @returns {CANNON.Body} The created heightfield body
+     * Create a CANNON.js heightfield body from height map data
+     * @param {Object} heightMap - Height map data
+     * @param {CANNON.World} world - Physics world to add the body to
+     * @returns {CANNON.Body} The created body
      */
     static createHeightfieldBody(heightMap, world) {
-        if (!heightMap) {
-            console.error('No height map provided for heightfield creation');
-            return null;
+        if (!heightMap || !world) return null;
+        
+        // Extract data from the height map
+        const { width, height, data, minHeight, maxHeight, physicalWidth, physicalLength } = heightMap;
+        
+        // Create a heightfield matrix for CANNON.js
+        const matrix = [];
+        for (let i = 0; i < height; i++) {
+            matrix[i] = [];
+            for (let j = 0; j < width; j++) {
+                const index = (i * width + j) * 4;
+                // Use the red channel for height data
+                const heightValue = data[index] * (maxHeight - minHeight) + minHeight;
+                matrix[i][j] = heightValue;
+            }
         }
         
-        const { data, width, height, minHeight, maxHeight, physicalWidth, physicalLength } = heightMap;
-        
-        console.log(`Creating heightfield from ${width}x${height} height map`);
-        console.log(`Height range: ${minHeight} to ${maxHeight}`);
-        
-        // Create a 2D array for the heightfield data
-        const heightfieldData = [];
+        // Fix the matrix orientation to ensure correct face normals
+        // CANNON.js expects heightfields to have CCW winding order
+        const fixedMatrix = [];
         for (let i = 0; i < height; i++) {
-            const row = [];
+            fixedMatrix[i] = [];
             for (let j = 0; j < width; j++) {
-                // Get the height value from the red channel
-                const pixelIndex = (i * width + j) * 4;
-                const heightValue = data[pixelIndex] * (maxHeight - minHeight) + minHeight;
-                
-                // Scale the height to make it more pronounced
-                const scaledHeight = heightValue * 2.0; // Amplify the height differences
-                
-                row.push(scaledHeight);
+                // Invert the matrix along one axis to fix the winding order
+                fixedMatrix[i][j] = matrix[height - 1 - i][j];
             }
-            heightfieldData.push(row);
         }
         
         // Create the heightfield shape
-        const elementSize = physicalWidth / (width - 1);
-        console.log(`Heightfield element size: ${elementSize}`);
-        
-        const heightfieldShape = new CANNON.Heightfield(heightfieldData, {
-            elementSize: elementSize
+        // Note: CANNON.js heightfields have their own coordinate system
+        // where Y is up, which differs from THREE.js
+        const heightfieldShape = new CANNON.Heightfield(fixedMatrix, {
+            elementSize: physicalWidth / (width - 1)
         });
         
-        // Create the body
+        // Create a body with the heightfield shape
         const heightfieldBody = new CANNON.Body({ mass: 0 });
+        
+        // Rotate the heightfield to match the THREE.js coordinate system
+        // By default, CANNON.js heightfields are in the x-z plane with y up
+        // We need to rotate it to match our coordinate system where y is up
         heightfieldBody.addShape(heightfieldShape);
         
-        // Position the heightfield
-        heightfieldBody.position.set(
-            -physicalWidth / 2,
-            minHeight,
-            -physicalLength / 2
-        );
+        // Calculate the proper position offsets based on the heightfield size
+        // This ensures the heightfield is properly centered
+        const sizeX = physicalWidth;
+        const sizeZ = physicalLength;
         
-        // Rotate the heightfield to match the CANNON.js coordinate system
-        heightfieldBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+        // Position the heightfield centered at the origin
+        heightfieldBody.position.set(-sizeX / 2, 0, -sizeZ / 2);
         
-        // Add to the world
-        if (world) {
-            world.addBody(heightfieldBody);
-            console.log('Added heightfield body to physics world');
-        }
+        // Add the body to the world
+        world.addBody(heightfieldBody);
+        
+        console.log(`Created heightfield body with dimensions ${width}x${height}`);
         
         return heightfieldBody;
     }
@@ -339,54 +340,17 @@ class HeightMapGenerator {
         geometry.attributes.position.needsUpdate = true;
         geometry.computeVertexNormals();
         
-        // Create a material with height-based coloring
+        // Create a HOT PINK material with height-based coloring
         const material = new THREE.MeshStandardMaterial({
+            color: 0xFF1493, // Hot Pink color
+            emissive: 0xFF1493, // Hot Pink emissive color for extra visibility
+            emissiveIntensity: 0.7, // Higher intensity for better visibility
             wireframe: true,
             side: THREE.DoubleSide,
-            vertexColors: true,
             transparent: true,
-            opacity: 0.2 // Make it very subtle
+            opacity: 0.8, // More opaque for better visibility
+            wireframeLinewidth: 3 // Thicker wireframe (note: not supported in all browsers)
         });
-        
-        // Add vertex colors based on height
-        const colors = new Float32Array(vertices.length);
-        const color = new THREE.Color();
-        
-        for (let i = 0; i < height; i++) {
-            for (let j = 0; j < width; j++) {
-                const index = (i * width + j);
-                const vertexIndex = index * 3;
-                const colorIndex = index * 3;
-                
-                // Get normalized height (0 to 1)
-                const normalizedHeight = (vertices[vertexIndex + 1] - minHeight) / ((maxHeight - minHeight) * 2.0 || 1);
-                
-                // Create color gradient based on height
-                if (normalizedHeight < 0.2) {
-                    // Blue for low areas
-                    color.setRGB(0, 0, 1);
-                } else if (normalizedHeight < 0.4) {
-                    // Cyan for lower-mid areas
-                    color.setRGB(0, normalizedHeight * 2, 1);
-                } else if (normalizedHeight < 0.6) {
-                    // Green for mid areas
-                    color.setRGB(0, 1, normalizedHeight < 0.5 ? 1 : 2 - normalizedHeight * 2);
-                } else if (normalizedHeight < 0.8) {
-                    // Yellow for upper-mid areas
-                    color.setRGB(normalizedHeight * 1.25, 1, 0);
-                } else {
-                    // Red for high areas
-                    color.setRGB(1, 2 - normalizedHeight * 2, 0);
-                }
-                
-                colors[colorIndex] = color.r;
-                colors[colorIndex + 1] = color.g;
-                colors[colorIndex + 2] = color.b;
-            }
-        }
-        
-        // Add colors to geometry
-        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
         
         // Create the mesh
         const mesh = new THREE.Mesh(geometry, material);
@@ -394,45 +358,10 @@ class HeightMapGenerator {
         // Rotate to match the CANNON.js heightfield
         mesh.rotation.x = -Math.PI / 2;
         
-        // Position the mesh
-        mesh.position.set(0, 0, 0);
-        
         // Add to the scene
         scene.add(mesh);
         
-        // Only add grid helpers if debug is explicitly enabled
-        // We'll check for a debug flag in the scene's userData
-        const debugEnabled = scene.userData && scene.userData.debugEnabled;
-        
-        if (debugEnabled) {
-            // Add a grid helper to better visualize the terrain
-            const gridHelper = new THREE.GridHelper(
-                Math.max(physicalWidth, physicalLength), 
-                20, 
-                0x888888, 
-                0x444444
-            );
-            gridHelper.position.y = 0.1; // Position slightly above the terrain
-            scene.add(gridHelper);
-            
-            // Add a wireframe box to show the height range
-            const boxGeometry = new THREE.BoxGeometry(
-                physicalWidth, 
-                (maxHeight - minHeight) * 2.0, 
-                physicalLength
-            );
-            const boxMaterial = new THREE.MeshBasicMaterial({
-                wireframe: true,
-                color: 0xff0000
-            });
-            const boxMesh = new THREE.Mesh(boxGeometry, boxMaterial);
-            boxMesh.position.set(
-                0,
-                minHeight + (maxHeight - minHeight), // Center vertically in the height range
-                0
-            );
-            scene.add(boxMesh);
-        }
+        console.log(`Created HOT PINK height map visualization with ${width}x${height} resolution`);
         
         return mesh;
     }
@@ -481,6 +410,113 @@ class HeightMapGenerator {
         texture.needsUpdate = true;
         
         return texture;
+    }
+    
+    /**
+     * Generate artificial terrain data for visualization and physics
+     * @param {Object} options - Configuration options
+     * @param {Number} options.resolution - Resolution of the height map
+     * @param {Number} options.width - Width of the terrain
+     * @param {Number} options.length - Length of the terrain
+     * @returns {Object} The artificial height map data
+     */
+    static generateArtificialTerrain(options = {}) {
+        const resolution = options.resolution || 256;
+        const width = options.width || 200;
+        const length = options.length || 200;
+        
+        console.log(`Generating artificial terrain at resolution ${resolution}x${resolution} with size ${width}x${length}`);
+        
+        // Create a data array
+        const data = new Float32Array(resolution * resolution * 4);
+        
+        // Create artificial terrain using multiple noise functions
+        for (let i = 0; i < resolution; i++) {
+            for (let j = 0; j < resolution; j++) {
+                const pixelIndex = (i * resolution + j) * 4;
+                
+                // Normalize coordinates to -1 to 1 range
+                const x = (j / resolution) * 2 - 1;
+                const z = (i / resolution) * 2 - 1;
+                
+                // Calculate distance from center
+                const distanceFromCenter = Math.sqrt(x * x + z * z);
+                
+                // Create a base bowl-shaped terrain that rises at the edges
+                let height = distanceFromCenter * 3;
+                
+                // Add some hills using sine waves
+                height += Math.sin(x * 5) * Math.cos(z * 5) * 2;
+                
+                // Add a central mound
+                height -= Math.exp(-(x*x + z*z) * 2) * 5;
+                
+                // Add some smaller bumps
+                height += Math.sin(x * 20) * Math.cos(z * 20) * 0.5;
+                
+                // Add a ramp feature in one quadrant
+                if (x > 0 && z > 0) {
+                    height += (x + z) * 3;
+                }
+                
+                // Add a canyon/trench feature
+                if (Math.abs(x - 0.3) < 0.1) {
+                    height -= 2;
+                }
+                
+                // Add a plateau
+                if (x < -0.3 && z < -0.3) {
+                    height = Math.max(height, 2);
+                }
+                
+                // Store the height in all channels (for compatibility with other functions)
+                data[pixelIndex] = height;
+                data[pixelIndex + 1] = height;
+                data[pixelIndex + 2] = height;
+                data[pixelIndex + 3] = 1;
+            }
+        }
+        
+        // Find min and max heights
+        let minHeight = Infinity;
+        let maxHeight = -Infinity;
+        
+        for (let i = 0; i < resolution * resolution; i++) {
+            const pixelIndex = i * 4;
+            minHeight = Math.min(minHeight, data[pixelIndex]);
+            maxHeight = Math.max(maxHeight, data[pixelIndex]);
+        }
+        
+        // Normalize heights to a reasonable range
+        const desiredMinHeight = -5;
+        const desiredMaxHeight = 5;
+        const scale = (desiredMaxHeight - desiredMinHeight) / (maxHeight - minHeight);
+        
+        for (let i = 0; i < resolution * resolution; i++) {
+            const pixelIndex = i * 4;
+            data[pixelIndex] = (data[pixelIndex] - minHeight) * scale + desiredMinHeight;
+            data[pixelIndex + 1] = data[pixelIndex];
+            data[pixelIndex + 2] = data[pixelIndex];
+        }
+        
+        // Update min/max heights
+        minHeight = desiredMinHeight;
+        maxHeight = desiredMaxHeight;
+        
+        console.log(`Artificial terrain generated with height range: ${minHeight} to ${maxHeight}`);
+        
+        // Create the height map data
+        const heightMap = {
+            data: data,
+            width: resolution,
+            height: resolution,
+            minHeight: minHeight,
+            maxHeight: maxHeight,
+            physicalWidth: width,
+            physicalLength: length
+        };
+        
+        return heightMap;
     }
 }
 

@@ -15,16 +15,24 @@ class MiltonMXTrack extends BaseTrack {
         this.name = 'Milton MX Track';
         this.modelPath = 'models/tracks/milton_mx_4k.glb';
         this.debugEnabled = false; // Keep debug visualization disabled per user preference
+        this.showHeightMapOverlay = true; // Show just the height map overlay without other debug elements
         
         // Scale factor for the track model
-        this.modelScale = 40.0; // Match the multiplier used for physics dimensions
+        this.modelScale = 1.0; // Match the multiplier used for physics dimensions
         
         // User preferences for which ramps to show
         this.rampVisibility = {
-            north: false,  // red ramp
-            east: false,   // green ramp
-            south: true,   // blue ramp - only this one should be visible based on user preferences
-            west: false    // yellow ramp
+            north: true,  // red ramp
+            east: true,   // green ramp
+            south: true,   // blue ramp
+            west: true    // yellow ramp
+        };
+        
+        // Track dimensions - default values
+        this.trackDimensions = {
+            width: 600, // Default width before model is loaded
+            length: 600, // Default length before model is loaded
+            height: 200  // Default height before model is loaded
         };
         
         // Height map settings
@@ -33,24 +41,24 @@ class MiltonMXTrack extends BaseTrack {
         this.heightMapMesh = null;
         this.heightfieldBody = null;
         
+        // Track level settings - important for alignment
+        this.groundLevel = -20; // Set to match where the ATV actually is
+        this.actualGroundLevel = -20; // Will be updated based on vehicle position
+        
+        // Flag to track if height map position has been updated
+        this.heightMapPositionUpdated = false;
+        
         // Track-specific physics properties
         this.trackFriction = 0.1;  // Lower friction for faster movement
         this.trackRestitution = 0.1; // Lower restitution for less bouncing
         
-        // Track-specific vehicle settings
-        this.vehicleSettings = {
-            speed: 4000,         // Reduced from 5000 to make it more controllable
-            turnSpeed: 1.0,      // Reduced from 1.5 to make turning less aggressive
-            maxEngineForce: 12000, // Reduced from 15000 for better control
-            rollInfluence: 0.01,  // Increased from 0.005 for better stability
-            suspensionStiffness: 35, // Increased from 30 for better handling
-            dampingRelaxation: 2.5, // Increased from 2.3 for better stability
-            dampingCompression: 4.6, // Increased from 4.4 for better stability
-            linearDamping: 0.05,   // Increased from 0.01 to reduce excessive speed
-            angularDamping: 0.2,    // Increased from 0.1 to reduce excessive turning
-            // Add a small right bias to counteract the left turning issue
-            rightBias: 0.05      // New parameter to counteract left turning bias
-        };
+        // Initialize arrays for game objects
+        this.ramps = [];
+        this.rampMeshes = [];
+        this.checkpoints = [];
+        this.lights = [];
+        this.walls = [];
+        this.debugMeshes = [];
     }
     
     /**
@@ -78,26 +86,25 @@ class MiltonMXTrack extends BaseTrack {
                 (gltf) => {
                     this.trackMesh = gltf.scene;
                     
-                    // Scale and position the track - using the defined scale factor
+                    // Scale and position the track
                     this.trackMesh.scale.set(this.modelScale, this.modelScale, this.modelScale);
-                    this.trackMesh.position.set(0, 0, 0); // Set to origin, physics will be positioned accordingly
+                    this.trackMesh.position.set(0, this.groundLevel, 0); // Position at the same ground level (-20) as the height map and ATV
                     
+                    // Extract dimensions from model for reference
                     console.log(`Scaling track model by factor: ${this.modelScale}`);
                     
-                    // Log the structure of the loaded model for debugging
+                    // Log model structure for debugging
                     this.logModelStructure(this.trackMesh);
                     
                     // Add the track to the scene
                     this.scene.add(this.trackMesh);
                     
-                    // Create physics for the track
+                    // Create physics for the track using main physics method
                     this.createPhysics();
                     
-                    // Add ramps and other track features
+                    // Create checkpoints and ramps
+                    this.createCheckpoints();
                     this.createRamps();
-                    
-                    // Modify vehicle physics for this track
-                    this.adjustVehiclePhysics();
                     
                     console.log('Milton MX track loaded successfully');
                     resolve(this);
@@ -278,45 +285,49 @@ class MiltonMXTrack extends BaseTrack {
     }
     
     /**
-     * Create physics for the track
-     * This implementation creates a physics representation based on the track's geometry
+     * Create physics bodies for the track
+     * This is the main entry point for physics creation
      */
     createPhysics() {
-        // Calculate the bounding box of the track model to determine its dimensions
-        this.trackDimensions = this.computeBoundingBox(this.trackMesh);
+        console.log('Creating physics for Milton MX track');
         
-        // Find the terrain mesh for height map generation
-        let terrainMesh = null;
-        this.trackMesh.traverse((child) => {
-            if (child.isMesh) {
-                // Look for the main terrain mesh - typically the largest mesh with "material0_0" in the name
-                if (child.name.includes('material0_0')) {
-                    terrainMesh = child;
-                    console.log(`Found terrain mesh for height map: ${child.name}`);
-                }
-            }
-        });
-        
-        // Create physics based on the height map if enabled and terrain mesh is found
-        if (this.useHeightMap && terrainMesh) {
-            console.log('Using height map physics with specific terrain mesh');
-            this.createHeightMapPhysics(terrainMesh);
-        } else if (this.useHeightMap) {
-            console.log('Using height map physics with entire track mesh');
+        if (this.useHeightMap) {
+            console.log('Using height map for physics');
             this.createHeightMapPhysics(this.trackMesh);
         } else {
-            // Fallback to flat ground plane
-            console.log('Falling back to flat physics (height map disabled)');
+            console.log('Using flat physics');
             this.createFlatPhysics();
         }
+    }
+
+    /**
+     * Create flat physics for the track
+     * This is used as a fallback if height map creation fails
+     */
+    createFlatPhysics() {
+        console.log('Creating flat physics for Milton MX track');
         
-        // Create walls around the track - using the track dimensions
-        const halfWidth = this.trackDimensions.width / 2;
-        const halfLength = this.trackDimensions.length / 2;
-        this.createTrackBoundaries(0, 0, halfWidth, halfLength);
+        // Create a flat ground plane
+        const groundBody = new CANNON.Body({
+            mass: 0,
+            material: this.materials.ground
+        });
         
-        // Log the track dimensions for debugging
-        console.log(`Track dimensions: Width=${this.trackDimensions.width}, Length=${this.trackDimensions.length}, Height Range=${this.trackDimensions.minY} to ${this.trackDimensions.maxY}`);
+        // Use a large plane to ensure the vehicle can't fall off
+        const groundShape = new CANNON.Plane();
+        groundBody.addShape(groundShape);
+        
+        // Rotate to be horizontal and position at ground level
+        groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2);
+        groundBody.position.set(0, this.groundLevel, 0);
+        
+        this.world.addBody(groundBody);
+        this.trackCollider = groundBody;
+        
+        // Create our hot pink floor visualization even with flat physics
+        this.createHotPinkFloor();
+        
+        console.log('Flat physics created successfully');
     }
     
     /**
@@ -324,10 +335,13 @@ class MiltonMXTrack extends BaseTrack {
      * @param {THREE.Object3D} terrainMesh - The mesh to use for height map generation
      */
     createHeightMapPhysics(terrainMesh) {
-        console.log('Creating physics using height map from terrain mesh');
+        console.log('Creating artificial hot pink terrain for visual debugging');
         
-        // Generate the height map
-        const heightMap = HeightMapGenerator.generateFromMesh(terrainMesh, {
+        // Use defined track dimensions to create our hot pink height map
+        console.log(`Using track dimensions: ${this.trackDimensions.width}x${this.trackDimensions.length}`);
+        
+        // Generate artificial terrain for visualization
+        const heightMap = HeightMapGenerator.generateArtificialTerrain({
             resolution: this.heightMapResolution,
             width: this.trackDimensions.width,
             length: this.trackDimensions.length
@@ -339,91 +353,113 @@ class MiltonMXTrack extends BaseTrack {
             return;
         }
         
-        console.log(`Height map generated with range: ${heightMap.minHeight} to ${heightMap.maxHeight}`);
-        
-        // If the height range is too small, the terrain is likely flat
-        if (Math.abs(heightMap.maxHeight - heightMap.minHeight) < 0.1) {
-            console.warn('Height map has very small height range, terrain may be flat');
-        }
+        console.log(`Hot pink terrain generated with height range: ${heightMap.minHeight} to ${heightMap.maxHeight}`);
         
         // Create the heightfield body
         this.heightfieldBody = HeightMapGenerator.createHeightfieldBody(heightMap, this.world);
         
         // Adjust the heightfield position to ensure it aligns with the visual mesh
-        // This is critical to prevent the ATV from floating above the ground
         if (this.heightfieldBody) {
             // Adjust the Y position to ensure the terrain is at ground level
-            this.heightfieldBody.position.y = -2; // Lower the heightfield to match the visual ground
+            this.heightfieldBody.position.y = this.groundLevel; // Use consistent ground level
             console.log(`Adjusted heightfield position to y=${this.heightfieldBody.position.y}`);
         }
         
         this.trackCollider = this.heightfieldBody;
         
-        // Create a visualization of the height map if debug is enabled
-        if (this.debugEnabled) {
-            const heightMapMesh = HeightMapGenerator.createHeightMapVisualization(heightMap, this.scene);
-            if (heightMapMesh) {
-                this.heightMapMesh = heightMapMesh;
-                this.debugMeshes.push(heightMapMesh);
-            }
+        // Create a hot pink visualization of the height map for debugging
+        this.heightMapMesh = HeightMapGenerator.createHeightMapVisualization(heightMap, this.scene);
+        
+        // Position the visualization mesh to match the physics body
+        if (this.heightMapMesh) {
+            // Position exactly at the same coordinates as the physics body but at the ground level
+            this.heightMapMesh.position.set(
+                this.heightfieldBody.position.x, 
+                this.groundLevel, // Exactly at ground level
+                this.heightfieldBody.position.z
+            );
+            
+            // Make sure it's visible
+            this.heightMapMesh.visible = true;
+            
+            // Create a clearly visible hot pink floor
+            this.createHotPinkFloor();
+            
+            console.log('Added HOT PINK terrain visualization for debugging at ground level: ' + this.groundLevel);
         }
         
-        console.log('Height map physics created successfully');
+        console.log('Hot pink terrain visualized successfully');
     }
     
     /**
-     * Create flat physics as a fallback
+     * Create a clearly visible hot pink floor for debugging
      */
-    createFlatPhysics() {
-        console.log('Creating flat physics for the track');
+    createHotPinkFloor() {
+        // Create a wireframe floor plane to ensure visibility of ground level
+        const floorGeometry = new THREE.PlaneGeometry(
+            this.trackDimensions.width, 
+            this.trackDimensions.length, 
+            40, 40 // Higher resolution grid
+        );
         
-        // Create a flat ground plane for the physics
-        const groundShape = new CANNON.Plane();
-        const groundBody = new CANNON.Body({ mass: 0 });
-        groundBody.addShape(groundShape);
-        groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2); // Rotate to be flat
-        groundBody.position.set(0, 0, 0); // Position at y=0
-        this.world.addBody(groundBody);
-        this.trackCollider = groundBody;
+        // Use a bright hot pink material that's unmistakable
+        const floorMaterial = new THREE.MeshStandardMaterial({
+            color: 0xFF1493, // Hot Pink
+            emissive: 0xFF1493, // Same hot pink for glow
+            emissiveIntensity: 0.8, // High intensity for better visibility
+            wireframe: true,
+            opacity: 0.9,
+            transparent: true,
+            side: THREE.DoubleSide,
+            wireframeLinewidth: 3 // Note: not supported in WebGL but worth trying
+        });
         
-        // Create additional flat platforms at different heights to better match the terrain
-        const platformWidth = this.trackDimensions.width;
-        const platformLength = this.trackDimensions.length;
-        this.createFlatPlatform(0, 10, 0, platformWidth, platformLength);  // Main platform
+        const floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
+        floorMesh.rotation.x = Math.PI / 2; // Rotate to be horizontal
+        floorMesh.position.set(0, this.groundLevel + 0.1, 0); // Slightly above ground level
+        this.scene.add(floorMesh);
+        
+        // Store a reference to this mesh for later position updates
+        this.floorMesh = floorMesh;
+        
+        // Add large markers at cardinal points on floor grid for better orientation
+        this.addFloorMarker(this.trackDimensions.width/2, this.groundLevel + 0.2, 0, 0xFF0000); // East - Red
+        this.addFloorMarker(-this.trackDimensions.width/2, this.groundLevel + 0.2, 0, 0x00FF00); // West - Green
+        this.addFloorMarker(0, this.groundLevel + 0.2, this.trackDimensions.length/2, 0x0000FF); // North - Blue
+        this.addFloorMarker(0, this.groundLevel + 0.2, -this.trackDimensions.length/2, 0xFFFF00); // South - Yellow
+        this.addFloorMarker(0, this.groundLevel + 0.2, 0, 0xFFFFFF); // Center - White
+        
+        console.log('Created hot pink floor at ground level: ' + this.groundLevel);
     }
     
     /**
-     * Create a flat platform at the specified position
-     * @param {Number} x - X position
-     * @param {Number} y - Y position
-     * @param {Number} z - Z position
-     * @param {Number} width - Width of the platform
-     * @param {Number} depth - Depth of the platform
+     * Add a marker to help orient on the floor grid
      */
-    createFlatPlatform(x, y, z, width, depth) {
-        const platformShape = new CANNON.Box(new CANNON.Vec3(width/2, 0.5, depth/2));
-        const platformBody = new CANNON.Body({ mass: 0 });
-        platformBody.addShape(platformShape);
-        platformBody.position.set(x, y, z);
-        this.world.addBody(platformBody);
+    addFloorMarker(x, y, z, color) {
+        // Create a sphere marker
+        const markerGeometry = new THREE.SphereGeometry(5, 16, 16);
+        const markerMaterial = new THREE.MeshStandardMaterial({
+            color: color,
+            emissive: color,
+            emissiveIntensity: 1.0
+        });
         
-        // Add to walls array for cleanup
-        this.walls.push(platformBody);
+        const marker = new THREE.Mesh(markerGeometry, markerMaterial);
+        marker.position.set(x, y, z);
+        this.scene.add(marker);
         
-        // Add debug visualization if enabled
-        if (this.debugEnabled) {
-            const platformGeometry = new THREE.BoxGeometry(width, 1, depth);
-            const platformMaterial = new THREE.MeshBasicMaterial({ 
-                color: 0xff0000,
-                transparent: true,
-                opacity: 0.3,
-                wireframe: true
-            });
-            const platformMesh = new THREE.Mesh(platformGeometry, platformMaterial);
-            platformMesh.position.copy(platformBody.position);
-            this.scene.add(platformMesh);
-            this.debugMeshes.push(platformMesh);
-        }
+        // Add a spotlight to illuminate the marker
+        const spotLight = new THREE.SpotLight(color, 2);
+        spotLight.position.set(x, y + 20, z);
+        spotLight.target = marker;
+        spotLight.angle = Math.PI / 6;
+        spotLight.penumbra = 0.2;
+        spotLight.decay = 1;
+        spotLight.distance = 100;
+        this.scene.add(spotLight);
+        this.lights.push(spotLight);
+        
+        return marker;
     }
     
     /**
@@ -479,17 +515,248 @@ class MiltonMXTrack extends BaseTrack {
      * Create ramps for the track
      */
     createRamps() {
-        // Add ramps with different colors - but only make them visible based on user preferences
+        // Define ramp positions and properties
+        const rampConfigs = [
+            // North - Red Ramp - at the front of the track
+            {
+                position: { x: 0, y: 0, z: 140 },
+                rotation: { x: 0, y: Math.PI, z: 0 },
+                size: { width: 40, height: 15, depth: 40 },
+                color: 0xff0000, // Red
+                visible: this.rampVisibility.north
+            },
+            // East - Green Ramp - at the right of the track
+            {
+                position: { x: 140, y: 0, z: 0 },
+                rotation: { x: 0, y: Math.PI * 1.5, z: 0 },
+                size: { width: 40, height: 15, depth: 40 },
+                color: 0x00ff00, // Green
+                visible: this.rampVisibility.east
+            },
+            // South - Blue Ramp - at the back of the track
+            {
+                position: { x: 0, y: 0, z: -140 },
+                rotation: { x: 0, y: 0, z: 0 },
+                size: { width: 40, height: 15, depth: 40 },
+                color: 0x0000ff, // Blue
+                visible: this.rampVisibility.south
+            },
+            // West - Yellow Ramp - at the left of the track
+            {
+                position: { x: -140, y: 0, z: 0 },
+                rotation: { x: 0, y: Math.PI * 0.5, z: 0 },
+                size: { width: 40, height: 15, depth: 40 },
+                color: 0xffff00, // Yellow
+                visible: this.rampVisibility.west
+            }
+        ];
         
-        // South ramp (blue) - This is the only one that should be visible based on user preferences
-        if (this.rampVisibility.south) {
-            // Position the ramp on the track surface
-            const rampX = 0;
-            const rampZ = -100;
-            const rampY = 5; // Position at a reasonable height
-            
-            this.createRamp(rampX, rampZ, 40, 15, 50, Math.PI/12, 'z', 0x0000FF);
+        // Create each ramp
+        for (const config of rampConfigs) {
+            if (config.visible) {
+                this.createRamp(config);
+            }
         }
+    }
+    
+    /**
+     * Create a ramp at the specified position with the specified properties
+     * @param {Object} options - Ramp options
+     */
+    createRamp(options) {
+        // Extract options with defaults
+        const {
+            position = { x: 0, y: 0, z: 0 },
+            rotation = { x: 0, y: 0, z: 0 },
+            size = { width: 20, height: 10, depth: 30 },
+            color = 0xff0000,
+            mass = 0
+        } = options;
+        
+        // Get the hex color name for debugging
+        const colorName = this.getColorName(color);
+        
+        console.log(`Creating ${colorName} ramp at (${position.x}, ${position.y}, ${position.z})`);
+        
+        // Create visual mesh for the ramp
+        
+        // Box geometry for the ramp
+        const geometry = new THREE.BoxGeometry(size.width, size.height, size.depth);
+        
+        // Material with emissive component for better visibility
+        const material = new THREE.MeshStandardMaterial({
+            color: color,
+            emissive: color,
+            emissiveIntensity: 0.5,
+            roughness: 0.4,
+            metalness: 0.6,
+            side: THREE.DoubleSide
+        });
+        
+        // Create mesh and position it
+        const rampMesh = new THREE.Mesh(geometry, material);
+        
+        // Position the ramp at ground level plus half height to sit on ground
+        // IMPORTANT: Use this.groundLevel which is -20 to match the track and height map
+        const rampY = this.groundLevel + (size.height / 2);
+        rampMesh.position.set(position.x, rampY, position.z);
+        
+        // Apply rotation
+        rampMesh.rotation.set(rotation.x, rotation.y, rotation.z);
+        
+        // Add to scene
+        this.scene.add(rampMesh);
+        this.rampMeshes.push(rampMesh);
+        
+        console.log(`Added ${colorName} ramp visual mesh at y=${rampY}`);
+        
+        // Create physics body for the ramp at the same position
+        const rampBody = new CANNON.Body({
+            mass: mass,
+            position: new CANNON.Vec3(position.x, rampY, position.z),
+            shape: new CANNON.Box(new CANNON.Vec3(size.width / 2, size.height / 2, size.depth / 2))
+        });
+        
+        // Apply rotation to physics body
+        const quaternion = new CANNON.Quaternion();
+        quaternion.setFromEuler(rotation.x, rotation.y, rotation.z, 'XYZ');
+        rampBody.quaternion.copy(quaternion);
+        
+        // Add to physics world
+        this.world.addBody(rampBody);
+        this.ramps.push(rampBody);
+        
+        console.log(`Added ${colorName} ramp physics body at y=${rampY}`);
+        
+        // Add a spotlight to illuminate the ramp
+        const spotLight = new THREE.SpotLight(color, 2);
+        spotLight.position.set(position.x, rampY + 40, position.z); // Position light above the ramp
+        spotLight.target = rampMesh;
+        spotLight.angle = Math.PI / 4;
+        spotLight.penumbra = 0.2;
+        spotLight.decay = 1;
+        spotLight.distance = 100;
+        spotLight.castShadow = true;
+        this.scene.add(spotLight);
+        this.lights.push(spotLight);
+        
+        console.log(`Added spotlight for ${colorName} ramp`);
+    }
+    
+    /**
+     * Create checkpoints for the track
+     * This implementation adds checkpoints to detect lap completion
+     */
+    createCheckpoints() {
+        console.log('Creating checkpoints for track');
+        
+        // Define checkpoint positions around the track
+        const checkpointSpacing = 100; // Gap between checkpoints
+        const checkpointHeight = 40; // Height of checkpoint gate
+        
+        // Define the checkpoints to create
+        const checkpoints = [
+            // Start/Finish line
+            {
+                position: { x: 0, y: 5, z: checkpointSpacing },
+                size: { width: 60, height: checkpointHeight, depth: 1 },
+                color: 0xffffff,
+                name: 'start_finish',
+                index: 0
+            },
+            // Checkpoint 1
+            {
+                position: { x: checkpointSpacing, y: 5, z: 0 },
+                size: { width: 60, height: checkpointHeight, depth: 1 },
+                rotation: { x: 0, y: Math.PI / 2, z: 0 },
+                color: 0x00ffff,
+                name: 'checkpoint_1',
+                index: 1
+            },
+            // Checkpoint 2
+            {
+                position: { x: 0, y: 5, z: -checkpointSpacing },
+                size: { width: 60, height: checkpointHeight, depth: 1 },
+                color: 0xff00ff,
+                name: 'checkpoint_2', 
+                index: 2
+            },
+            // Checkpoint 3
+            {
+                position: { x: -checkpointSpacing, y: 5, z: 0 },
+                size: { width: 60, height: checkpointHeight, depth: 1 },
+                rotation: { x: 0, y: Math.PI / 2, z: 0 },
+                color: 0xffff00,
+                name: 'checkpoint_3',
+                index: 3
+            }
+        ];
+        
+        // Create the checkpoints
+        for (const checkpoint of checkpoints) {
+            this.createCheckpoint(checkpoint);
+        }
+    }
+    
+    /**
+     * Create a checkpoint on the track
+     * @param {Object} options - Checkpoint options
+     */
+    createCheckpoint(options) {
+        const {
+            position = { x: 0, y: 0, z: 0 },
+            rotation = { x: 0, y: 0, z: 0 },
+            size = { width: 40, height: 40, depth: 1 },
+            color = 0xffff00,
+            name = 'checkpoint',
+            index = 0
+        } = options;
+        
+        // Calculate Y position based on groundLevel
+        const yPosition = this.groundLevel + position.y; // Position relative to ground level
+        
+        // Create checkpoint mesh
+        const geometry = new THREE.BoxGeometry(size.width, size.height, size.depth);
+        const material = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: 0.3,
+            side: THREE.DoubleSide
+        });
+        
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(position.x, yPosition, position.z); // Position at correct ground level
+        mesh.rotation.set(rotation.x, rotation.y, rotation.z);
+        mesh.name = name;
+        this.scene.add(mesh);
+        
+        // Add a spotlight to illuminate the checkpoint
+        const spotLight = new THREE.SpotLight(color, 1);
+        spotLight.position.set(position.x, yPosition + 20, position.z); // Position light above checkpoint
+        spotLight.target = mesh;
+        spotLight.angle = Math.PI / 6;
+        spotLight.penumbra = 0.2;
+        spotLight.decay = 1;
+        spotLight.distance = 100;
+        this.scene.add(spotLight);
+        this.lights.push(spotLight);
+        
+        // Create checkpoint data
+        const checkpoint = {
+            mesh: mesh,
+            position: { x: position.x, y: yPosition, z: position.z }, // Store actual position
+            rotation: rotation,
+            size: size,
+            color: color,
+            name: name,
+            index: index
+        };
+        
+        this.checkpoints.push(checkpoint);
+        
+        console.log(`Created checkpoint '${name}' at (${position.x}, ${yPosition}, ${position.z})`);
+        
+        return checkpoint;
     }
     
     /**
@@ -510,73 +777,37 @@ class MiltonMXTrack extends BaseTrack {
     }
     
     /**
-     * Create a ramp on the track
-     * @param {Number} x - X position
-     * @param {Number} z - Z position
-     * @param {Number} width - Width of the ramp
-     * @param {Number} height - Height of the ramp
-     * @param {Number} depth - Depth of the ramp
-     * @param {Number} angle - Angle of inclination in radians
-     * @param {String} axis - Rotation axis ('x' or 'z')
-     * @param {Number} color - Color as a hex value
-     * @returns {Object} Object containing the ramp body and mesh
+     * Toggle the height map visualization overlay separately from debug elements
+     * @param {boolean} show - Whether to show the height map overlay
      */
-    createRamp(x, z, width, height, depth, angle, axis, color) {
-        // Create the physics body - position is key for a smooth transition
-        const rampBody = new CANNON.Body({ mass: 0 });
-        const rampShape = new CANNON.Box(new CANNON.Vec3(width/2, height/2, depth/2));
+    toggleHeightMapOverlay(show) {
+        this.showHeightMapOverlay = show;
         
-        // Calculate the vertical offset to make the edge flush with the ground
-        const verticalOffset = Math.sin(angle) * depth / 2;
+        if (this.heightMapMesh) {
+            this.heightMapMesh.visible = show;
+            
+            console.log(`Height map overlay ${show ? 'enabled' : 'disabled'}`);
+        }
+    }
+    
+    /**
+     * Enable or disable debug visualizations
+     * @param {boolean} enabled - Whether to enable debug visualizations
+     */
+    toggleDebug(enabled) {
+        this.debugEnabled = enabled;
         
-        // Add the shape with an offset to make the transition smooth
-        rampBody.addShape(rampShape);
-        
-        // Position the ramp
-        rampBody.position.set(x, verticalOffset + height/2, z);
-        
-        // Rotate the ramp based on the specified axis
-        if (axis === 'x') {
-            rampBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), angle);
-        } else {
-            rampBody.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 0, 1), angle);
+        // Toggle visibility of debug elements
+        if (this.debugWalls) {
+            this.debugWalls.visible = enabled;
         }
         
-        this.world.addBody(rampBody);
-        this.walls.push(rampBody);
+        if (this.debugBoundary) {
+            this.debugBoundary.visible = enabled;
+        }
         
-        // Create a visual representation of the ramp
-        const rampGeometry = new THREE.BoxGeometry(width, height, depth);
-        const rampMaterial = new THREE.MeshStandardMaterial({
-            color: color,
-            emissive: color,
-            emissiveIntensity: 0.5,
-            roughness: 0.5,
-            metalness: 0.5
-        });
-        
-        const rampMesh = new THREE.Mesh(rampGeometry, rampMaterial);
-        
-        // Position and rotate the visual mesh to match the physics body
-        rampMesh.position.copy(rampBody.position);
-        rampMesh.quaternion.copy(rampBody.quaternion);
-        
-        this.scene.add(rampMesh);
-        this.debugMeshes.push(rampMesh);
-        
-        // Add a spotlight to highlight the ramp
-        const spotlight = new THREE.SpotLight(color, 1);
-        spotlight.position.set(x, 50, z);
-        spotlight.target.position.set(x, 0, z);
-        spotlight.angle = Math.PI / 6;
-        spotlight.penumbra = 0.5;
-        spotlight.distance = 100;
-        spotlight.castShadow = true;
-        this.scene.add(spotlight);
-        this.scene.add(spotlight.target);
-        this.debugMeshes.push(spotlight);
-        
-        return { body: rampBody, mesh: rampMesh };
+        // Height map visualization is controlled separately by toggleHeightMapOverlay
+        // so we don't modify it here to respect user preferences
     }
     
     /**
@@ -603,6 +834,209 @@ class MiltonMXTrack extends BaseTrack {
         this.trackMaterial = null;
         
         console.log('Cleaned up Milton MX track height map resources');
+    }
+    
+    /**
+     * Get a friendly name for common colors
+     * @param {number} color - The hex color value
+     * @returns {string} A friendly name for the color or the hex string
+     */
+    getColorName(color) {
+        const colorMap = {
+            0xFF0000: 'Red',
+            0x00FF00: 'Green', 
+            0x0000FF: 'Blue',
+            0xFFFF00: 'Yellow',
+            0xFF1493: 'Hot Pink',
+            0xFFA500: 'Orange',
+            0x800080: 'Purple',
+            0x00FFFF: 'Cyan',
+            0xFF00FF: 'Magenta'
+        };
+        
+        return colorMap[color] || `#${color.toString(16).padStart(6, '0')}`;
+    }
+    
+    /**
+     * Update the track state
+     * @param {number} deltaTime - The time elapsed since the last update
+     */
+    update(deltaTime) {
+        // Call parent update first
+        super.update(deltaTime);
+        
+        // If we have a vehicle, update our actualGroundLevel to match its position
+        if (this.vehicle && this.heightMapMesh && !this.heightMapPositionUpdated) {
+            // Get the vehicle position
+            const vehicleY = this.vehicle.chassisBody.position.y;
+            
+            // Check if we need to update the position (if there's a significant difference)
+            if (Math.abs(vehicleY - 2 - this.groundLevel) > 1) {
+                // Update our actualGroundLevel based on the vehicle position
+                this.actualGroundLevel = vehicleY - 2; // Adjust to be slightly below the vehicle
+                
+                // Force an update to the ground level too
+                this.groundLevel = this.actualGroundLevel;
+                
+                // Move all our debug visualizations to match
+                this.updateHeightMapPosition();
+                
+                console.log(`Updated height map position to match vehicle at y=${vehicleY}, ground=${this.actualGroundLevel}`);
+            }
+            
+            // Only check this once after the vehicle is fully loaded
+            this.heightMapPositionUpdated = true;
+        }
+    }
+    
+    /**
+     * Update the height map position to match the actual ground level
+     */
+    updateHeightMapPosition() {
+        if (this.heightMapMesh) {
+            // Update the height map mesh position
+            this.heightMapMesh.position.y = this.actualGroundLevel;
+            
+            // Find and update all our debug visualization objects
+            this.scene.traverse((object) => {
+                // Check if this is one of our debug objects (has a specific property or material color)
+                if (object.isMesh && object.material && 
+                    (object.material.color && object.material.color.r > 0.9 && 
+                     object.material.color.g < 0.2 && object.material.color.b > 0.5)) {
+                    // This is likely our hot pink floor - adjust its Y position
+                    if (object !== this.heightMapMesh && object.position.y > -10 && object.position.y < 10) {
+                        object.position.y = this.actualGroundLevel + 0.2;
+                    }
+                }
+            });
+            
+            // Update the spotlight positions too
+            this.lights.forEach(light => {
+                if (light.isSpotLight && (light.color.r > 0.9 && light.color.g < 0.2 && light.color.b > 0.5)) {
+                    // This is a hot pink spotlight - adjust its target position
+                    if (light.target) {
+                        const targetYDelta = light.target.position.y - this.groundLevel;
+                        light.target.position.y = this.actualGroundLevel + targetYDelta;
+                    }
+                }
+            });
+            
+            console.log(`Moved all hot pink debug visualizations to actual ground level: ${this.actualGroundLevel}`);
+        }
+    }
+    
+    /**
+     * Initialize the track
+     */
+    initialize() {
+        console.log(`Initializing ${this.name}`);
+        
+        // Create the scene and physics world
+        this.scene = new THREE.Scene();
+        this.world = new CANNON.World();
+        this.world.gravity.set(0, -9.82, 0);
+        
+        // Set up a white ambient light to ensure everything is visible
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        this.scene.add(ambientLight);
+        
+        // Load the track model
+        if (this.modelPath) {
+            const loader = new GLTFLoader();
+            loader.load(this.modelPath, (gltf) => {
+                console.log('Track model loaded successfully', gltf);
+                
+                this.trackMesh = gltf.scene;
+                this.scene.add(this.trackMesh);
+                
+                if (this.trackMesh) {
+                    // Apply scale to the track model
+                    this.trackMesh.scale.set(this.modelScale, this.modelScale, this.modelScale);
+                    
+                    // Position the track model at the ground level (-20) to match the height map and ATV
+                    this.trackMesh.position.set(0, this.groundLevel, 0);
+                    
+                    // Traverse the model to adjust all children as well
+                    this.trackMesh.traverse((child) => {
+                        if (child.isMesh) {
+                            // Ensure all child meshes are visible and receive shadows
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                        }
+                    });
+                    
+                    // Extract dimensions from model for reference
+                    console.log(`Scaling track model by factor: ${this.modelScale}`);
+                    
+                    // Compute the track dimensions based on the loaded model
+                    const bbox = new THREE.Box3().setFromObject(this.trackMesh);
+                    const size = bbox.getSize(new THREE.Vector3());
+                    
+                    // Update the track dimensions
+                    this.trackDimensions = {
+                        width: size.x,
+                        length: size.z,
+                        height: size.y
+                    };
+                    
+                    console.log(`Track dimensions: ${size.x.toFixed(2)} x ${size.z.toFixed(2)} x ${size.y.toFixed(2)}`);
+                    
+                    // Create the physics body for the track
+                    if (this.useHeightMap) {
+                        console.log('Creating height map physics');
+                        this.createHeightMapPhysics(this.trackMesh);
+                    } else {
+                        console.log('Creating flat physics plane');
+                        this.createFlatPhysics();
+                    }
+                    
+                    // Setup ramps after the track is loaded
+                    this.createRamps();
+                    
+                    // Create checkpoints around the track
+                    this.createCheckpoints();
+                    
+                    // Create a hot pink floor visualization for debugging
+                    if (this.showHeightMapOverlay) {
+                        this.createHotPinkFloor();
+                    }
+                    
+                    // Setup track walls if needed
+                    if (this.needsWalls) {
+                        this.createWalls();
+                    }
+                    
+                    // Call the track loaded event
+                    if (this.onTrackLoaded) {
+                        this.onTrackLoaded();
+                    }
+                }
+            }, undefined, (error) => {
+                console.error('Error loading track model:', error);
+            });
+        } else {
+            console.warn('No track model specified');
+            
+            // Create physics even without a model
+            if (this.useHeightMap) {
+                this.createHeightMapPhysics();
+            } else {
+                this.createFlatPhysics();
+            }
+            
+            // Setup track components
+            this.createRamps();
+            this.createCheckpoints();
+            
+            if (this.needsWalls) {
+                this.createWalls();
+            }
+            
+            // Call the track loaded event
+            if (this.onTrackLoaded) {
+                this.onTrackLoaded();
+            }
+        }
     }
 }
 
