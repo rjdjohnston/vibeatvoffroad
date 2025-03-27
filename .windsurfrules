@@ -1,0 +1,39 @@
+# Windsurf Rules Configuration
+
+## Memory System Rules
+MEMORY_STORAGE: FILE_BASED
+MEMORY_ROOT: .windsurf
+MEMORY_USE_INTERNAL: false
+
+## Directory Structure
+PLANS_DIR: plans
+TASK_LOGS_DIR: task-logs
+CORE_FILES:
+  - activeContext.md
+  - productContext.md
+  - progress.md
+  - projectbrief.md
+  - systemPatterns.md
+  - techContext.md
+
+## File Naming Rules
+USE_TIMESTAMPS: true
+TIMESTAMP_FORMAT: YYYY-MM-DD
+FILENAME_FORMAT: kebab-case
+FILE_EXTENSION: .md
+
+## Content Rules
+FORMAT: markdown
+ADD_TIMESTAMPS: true
+PRESERVE_HISTORY: true
+NEW_CONTENT_POSITION: top
+
+## Cross-referencing
+USE_RELATIVE_LINKS: true
+MAINTAIN_INDEXES: true
+UPDATE_RELATED_FILES: true
+
+## Critical Instructions
+DO_NOT_USE_INTERNAL_MEMORY: true
+ALWAYS_USE_FILES: true
+UPDATE_ALL_RELATED_FILES: true
