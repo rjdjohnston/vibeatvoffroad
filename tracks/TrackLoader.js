@@ -4,6 +4,7 @@
  */
 
 import DriftRaceTrack from './DriftRaceTrack.js';
+import MiltonMXTrack from './MiltonMXTrack.js';
 
 /**
  * TrackLoader - Handles loading and instantiation of different track types
@@ -19,7 +20,8 @@ class TrackLoader {
         
         // Store track registry - mapping track IDs to their classes
         this.trackRegistry = {
-            'drift-race': DriftRaceTrack
+            'drift-race': DriftRaceTrack,
+            'milton-mx': MiltonMXTrack
             // Add more tracks here as they are implemented
             // 'desert': DesertTrack,
             // 'snow': SnowTrack, etc.

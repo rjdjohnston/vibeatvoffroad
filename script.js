@@ -663,7 +663,7 @@ function setupTouchControls() {
 // Game state variables
 let gameStarted = false;
 let playerName = '';
-let startPortalBox; // Global variable for start portal collision detection
+let currentTrack = null; // Store reference to the current tracklet startPortalBox; // Global variable for start portal collision detection
 let exitPortalBox; // Global variable for exit portal collision detection
 
 // Checkpoint system
@@ -778,9 +778,11 @@ world.addBody(groundBody);
 function loadTrack() {
     // Preload the default track (drift race track)
     return trackLoader.loadTrack('drift-race')
+    // Load the Milton MX track
+    // return trackLoader.loadTrack('milton-mx')
         .then(track => {
             console.log('Successfully loaded track:', track.name);
-            trackMesh = track.trackMesh;
+            currentTrack = track; // Store reference to the current track            trackMesh = track.trackMesh;
             trackCollider = track.trackCollider;
             return track;
         })
@@ -917,8 +919,20 @@ function animate() {
     if (!physicsPaused) {
         world.step(1 / 60);
         
-        const speed = 1200; // Balanced speed value
-        const turnSpeed = 1.2; // Standard turning speed
+        // Check if the current track has custom speed settings
+        let speed = 1200; // Default speed value
+        let turnSpeed = 1.2; // Default turning speed
+        
+        // Get track-specific speed settings if available
+        if (currentTrack && typeof currentTrack.getVehicleSettings === 'function') {
+            const trackSettings = currentTrack.getVehicleSettings();
+            if (trackSettings) {
+                speed = trackSettings.speed || speed;
+                turnSpeed = trackSettings.turnSpeed || turnSpeed;
+                console.log(`Using track-specific speed: ${speed}, turnSpeed: ${turnSpeed}`);
+            }
+        }
+        
         const localDirection = new CANNON.Vec3(0, 0, -1);
         const worldDirection = chassisBody.quaternion.vmult(localDirection);
         worldDirection.y = 0;
@@ -1003,9 +1017,11 @@ function animate() {
                 for (let i = 0; i < particleCount; i++) {
                     const idx = i * 3;
                     if (positions[idx + 1] < -0.4 || Math.random() < 0.2) {
-                        positions[idx] = atvMesh.position.x + (Math.random() - 0.5) * 4;
-                        positions[idx + 1] = 0 + Math.random() * 0.4;
-                        positions[idx + 2] = atvMesh.position.z + (Math.random() - 0.5) * 1;
+                        // Position dust particles at ground level, not at ATV height
+                        // Use the chassis position (not mesh position) and subtract height to reach ground
+                        positions[idx] = chassisBody.position.x + (Math.random() - 0.5) * 4;
+                        positions[idx + 1] = chassisBody.position.y - 1.5 + Math.random() * 0.4; // Position at ground level
+                        positions[idx + 2] = chassisBody.position.z + (Math.random() - 0.5) * 1;
                     } else {
                         positions[idx + 1] -= 0.05;
                         positions[idx] += (Math.random() - 0.5) * 0.1;
@@ -1113,7 +1129,7 @@ function animate() {
         // Update lap timer every frame if timing is active
         if (lastCheckpointTime > 0) {
             const currentTime = performance.now();
-            currentLapTime = (currentTime - lastCheckpointTime) / 1000;
+            currentLapTime = (currentTime - lastCheckpointTime) / 1000; // Convert to seconds
             updateCheckpointUI();
         }
 
