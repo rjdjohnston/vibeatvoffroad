@@ -657,7 +657,7 @@ function setupTouchControls() {
         setTimeout(() => {
             notification.removeChild(mobileControlsMsg);
         }, 2000);
-    }, 10000);
+    }, 3000);
 }
 
 // Game state variables
@@ -682,7 +682,7 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000000);
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
+renderer.setClearColor(0x0000ff); // Blue background (fallback)
 document.body.appendChild(renderer.domElement);
 
 // Multiplayer manager
@@ -2076,10 +2076,10 @@ function cleanupCheckpoints() {
 }
 
 // Show a notification message
-function showNotification(message, isError = false) {
-    // Skip notifications on mobile devices to keep the UI clean
-    if (window.isMobileDevice) {
-        // Just log the notification message instead
+function showNotification(message, isError = false, duration = 3000) {
+    // For mobile devices, only show important loading messages
+    if (window.isMobileDevice && !message.toLowerCase().includes('track')) {
+        // Just log other notification messages instead
         console.log(`Mobile notification (${isError ? 'error' : 'info'}):`, message);
         return;
     }
@@ -2102,14 +2102,16 @@ function showNotification(message, isError = false) {
     
     document.body.appendChild(notification);
     
-    // Remove after 3 seconds with fade effect
+    // Remove after specified duration with fade effect
     setTimeout(() => {
         notification.style.transition = 'opacity 0.5s ease-out';
         notification.style.opacity = '0';
         setTimeout(() => {
-            document.body.removeChild(notification);
+            if (document.body.contains(notification)) {
+                document.body.removeChild(notification);
+            }
         }, 500);
-    }, 3000);
+    }, duration);
 }
 
 // Toggle checkpoint edit mode
