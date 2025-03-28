@@ -777,9 +777,9 @@ world.addBody(groundBody);
 // Load 3D Race Track Model when game starts
 function loadTrack() {
     // Preload the default track (drift race track)
-    return trackLoader.loadTrack('drift-race')
+    // return trackLoader.loadTrack('drift-race')
     // Load the Milton MX track
-    // return trackLoader.loadTrack('milton-mx')
+    return trackLoader.loadTrack('milton-mx')
         .then(track => {
             console.log('Successfully loaded track:', track.name);
             currentTrack = track; // Store reference to the current track            trackMesh = track.trackMesh;
