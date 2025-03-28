@@ -917,7 +917,7 @@ function animate() {
     if (!physicsPaused) {
         world.step(1 / 60);
         
-        const speed = 1000; // Balanced speed value
+        const speed = 1250; // Balanced speed value
         const turnSpeed = 1.2; // Standard turning speed
         const localDirection = new CANNON.Vec3(0, 0, -1);
         const worldDirection = chassisBody.quaternion.vmult(localDirection);
