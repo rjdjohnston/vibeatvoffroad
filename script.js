@@ -695,7 +695,7 @@ let flipTimeout = 3000; // 3 seconds in milliseconds
 
 // Physics world
 const world = new CANNON.World();
-world.gravity.set(0, -15.82, 0);
+world.gravity.set(0, -9.82, 0); // Reduced from -15.82 to standard Earth gravity
 world.broadphase = new CANNON.NaiveBroadphase();
 world.solver.iterations = 20;
 
@@ -969,7 +969,13 @@ function animate() {
             settled = true;
             chassisBody.linearDamping = 0.5;
             chassisBody.angularDamping = 0.5;
-        }
+        } 
+        // else if (chassisBody.position.y > 0.9) {
+        //     // When in air, increase linear damping for more "air resistance"
+        //     settled = false;
+        //     chassisBody.linearDamping = 0.1; // Add slight air resistance
+        //     chassisBody.angularDamping = 0.1; // Allow some rotation in air
+        // }
 
         const maxAngular = 5;
         chassisBody.angularVelocity.x = Math.max(-maxAngular, Math.min(maxAngular, chassisBody.angularVelocity.x));
@@ -1113,7 +1119,7 @@ function animate() {
         // Update lap timer every frame if timing is active
         if (lastCheckpointTime > 0) {
             const currentTime = performance.now();
-            currentLapTime = (currentTime - lastCheckpointTime) / 1000;
+            currentLapTime = (currentTime - lastCheckpointTime) / 1000; // Convert to seconds
             updateCheckpointUI();
         }
 
